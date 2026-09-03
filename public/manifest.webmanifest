@@ -1,0 +1,23 @@
+{
+  "name": "발주관리앱",
+  "short_name": "발주관리앱",
+  "description": "발주관리앱",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#17213a",
+  "icons": [
+    {
+      "src": "/yhj-icon.png?v=34",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/yhj-icon.svg?v=34",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

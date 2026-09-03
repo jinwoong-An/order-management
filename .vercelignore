@@ -1,0 +1,9 @@
+data/
+backup/
+logs/
+seed/
+*.cmd
+*.ps1
+YhjLauncher.cs
+YHJ.ico
+먼저읽어주세요.txt

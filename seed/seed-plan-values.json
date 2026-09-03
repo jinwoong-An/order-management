@@ -1,0 +1,9 @@
+[
+  { "year": 2026, "item_label": "DEBEM", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "FLUIMAC", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "GRIFFCO", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "HIDRACAR", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "INJECTA", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "JESSBERGER", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" },
+  { "year": 2026, "item_label": "ETC", "customer": "ETC", "budget": null, "q2_budget": null, "q3_budget": null, "q4_budget": null, "next_budget": null, "source": "배포용 기본 구조" }
+]

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="light" name="color-scheme"/>
+<title>발주관리앱</title>
+<meta content="발주관리앱" name="application-name"/>
+<meta content="발주관리앱" name="apple-mobile-web-app-title"/>
+<link href="/manifest.webmanifest" rel="manifest"/>
+<link href="/yhj-icon.svg?v=34" rel="icon" type="image/svg+xml"/>
+<link href="/yhj-icon.png?v=34" rel="icon" sizes="256x256" type="image/png"/>
+<link href="/yhj-icon.png?v=34" rel="apple-touch-icon"/>
+<link href="/styles.css?v=64.0.0" rel="stylesheet"/>
+</head>
+<body>
+<div class="app-shell">
+<aside class="sidebar">
+<div class="brand">
+<div class="brand-mark" aria-label="발주관리앱"><img alt="발주관리앱" src="/yhj-icon.png?v=34"/></div>
+<div><strong>발주관리앱</strong><span>Order Management</span></div>
+</div>
+<nav aria-label="주 메뉴" class="side-nav"><button class="nav-item nav-new-order" id="sidebarNewOrderButton" type="button"><svg viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>신규 발주</span></button><button class="nav-item nav-analytics" data-view="analytics" type="button"><svg viewbox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"></path></svg><span>통합분석</span></button><button class="nav-item nav-orders active" data-view="orders" type="button"><svg viewbox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"></path></svg><span>발주 및 납품 관리</span></button><button class="nav-item nav-performance" data-view="performance" type="button"><svg viewbox="0 0 24 24"><path d="M4 20V10m5 10V4m6 16v-7m5 7V7M2 20h20"></path></svg><span>연간영업실적 및 계획</span></button><button class="nav-item nav-forecast" data-view="forecast" type="button"><svg viewbox="0 0 24 24"><path d="M3 12h18M12 3v18M5 5l14 14"></path></svg><span>월간회의</span></button></nav>
+<div class="sidebar-tools">
+<p>데이터 관리</p>
+<input accept=".xlsx,.xls" hidden="" id="excelFile" type="file"/>
+<input accept=".json" hidden="" id="restoreFile" type="file"/>
+<button class="sidebar-tool" id="importButton">엑셀 가져오기</button>
+<button class="sidebar-tool backup-primary-tool" id="nowBackupButton">지금 백업</button>
+<button class="sidebar-tool" id="backupManagerButton">백업 목록 · 복원</button>
+<button class="sidebar-tool" id="backupButton">JSON 백업 다운로드</button>
+<button class="sidebar-tool" id="restoreButton">JSON 파일 복원</button>
+<button class="sidebar-tool submission-create-tool" id="submissionButton">제출용 HTML 생성</button>
+</div>
+<div class="sidebar-user">
+<div class="avatar">YH</div>
+<div><strong>관리자</strong><span>개인 사용 모드</span></div>
+<span class="online-dot" title="서버 연결 상태"></span>
+</div>
+</aside>
+<main class="main-area">
+<div class="content-wrap">
+<header class="topbar">
+<div>
+<p class="breadcrumb">발주관리앱 / <span id="breadcrumbText">발주 및 납품 관리</span></p>
+<h1 id="pageTitle">발주 및 납품 관리</h1>
+<p id="pageSubtitle">발주 진행상태와 납기, 세금계산서를 한 화면에서 관리합니다.</p>
+</div>
+<div class="top-actions">
+<div class="year-control" hidden="" id="yearControl"><label for="analysisYear">기준 연도</label><select id="analysisYear"></select></div>
+<button class="button secondary" id="exportButton"><svg viewbox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"></path></svg><span>엑셀 다운로드</span></button>
+<button class="button primary" id="newOrderButton"><svg viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>신규 발주</span></button>
+</div>
+</header>
+<section class="view-section" hidden="" id="analyticsView">
+<div class="kpi-grid analytics-kpis">
+<article class="kpi-card accent-indigo"><div class="kpi-icon">#</div><div><span id="orderCountLabel">발주 건수</span><strong id="allOrderCount">0건</strong><small>선택 연도 기준</small></div></article>
+<article class="kpi-card accent-blue"><div class="kpi-icon">₩</div><div><span id="orderAmountLabel">발주 금액</span><strong id="allOrderAmount">0</strong><small>발주일 기준</small></div></article>
+<article class="kpi-card accent-teal"><div class="kpi-icon">T</div><div><span id="invoiceAmountLabel">세금계산서 금액</span><strong id="allInvoiceAmount">0</strong><small>계산서 일자 기준</small></div></article>
+<article class="kpi-card accent-violet budget-reference-card"><div class="kpi-icon">Y</div><div><span id="yearInvoiceLabel">세금계산서 건수</span><strong id="yearInvoiceCountTop">0건</strong><small id="yearInvoiceMeta">선택 연도 기준</small></div></article>
+</div>
+<div class="analysis-grid">
+<article class="panel monthly-panel">
+<div class="panel-head"><div><h2>월별 발주 · 세금계산서 금액</h2><p>월의 막대를 누르면 해당 월 세금계산서 거래처를 확인할 수 있습니다.</p></div><div class="chart-legend"><span class="legend-order">발주 금액</span><span class="legend-invoice">세금계산서 금액</span></div></div>
+<div class="monthly-chart" id="monthlyChart"></div>
+</article>
+<article class="panel year-summary-panel">
+<div class="panel-head"><div><h2 id="yearSummaryTitle">연간 요약</h2><p>선택한 연도 기준입니다.</p></div></div>
+<div class="year-summary-list">
+<div><span>발주 건수</span><strong id="yearOrderCount">0건</strong></div>
+<div><span>발주 금액</span><strong id="yearOrderAmount">0</strong></div>
+<div><span>계산서 발행 건수</span><strong id="yearInvoiceCount">0건</strong></div>
+<div><span>계산서 기준 금액</span><strong id="yearInvoiceAmountSide">0</strong></div>
+</div>
+</article>
+</div>
+<article class="panel customer-analysis-panel">
+<div class="panel-head customer-panel-head">
+<div><h2>거래처별 세금계산서 분석</h2><p>월 버튼을 누르면 해당 월 거래처별 세금계산서 내역이 팝업으로 열립니다.</p></div>
+<label class="mini-search"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="customerAnalysisSearch" placeholder="거래처 검색"/></label>
+</div>
+<div class="customer-month-bar" id="customerMonthBar"></div>
+<div class="customer-table-wrap"><table class="data-table customer-table"><thead id="customerTableHead"></thead><tbody id="customerTableBody"></tbody></table></div>
+<div class="empty-state" hidden="" id="customerEmpty"><strong>해당 조건의 계산서 데이터가 없습니다.</strong><span>다른 거래처를 검색해주세요.</span></div>
+</article>
+</section>
+<section class="view-section" id="ordersView">
+<div class="status-overview" id="statusOverview"></div>
+<article class="panel filter-panel">
+<div class="search-row">
+<div class="autocomplete-wrap">
+<label class="search-box"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input autocomplete="off" id="searchInput" placeholder="업체명, 모델, 메모, 발주번호 통합검색" type="search"/><button class="clear-search" id="clearSearchButton" type="button">×</button></label>
+<div class="autocomplete-list" hidden="" id="autocompleteList"></div>
+</div>
+<button class="button subtle" id="resetFilterButton">필터 초기화</button>
+</div>
+<div class="filter-line split-filter-line">
+<div class="filter-block"><span class="filter-label">진행 상태</span><div class="chip-group status-chips" id="statusFilterButtons"><button class="filter-chip main-progress" data-status="in_progress" type="button">진행 중</button><button class="filter-chip main-invoice" data-status="invoice_pending" type="button">계산서 대기</button><button class="filter-chip main-complete" data-status="complete" type="button">처리 완료</button></div></div>
+<div class="filter-block due-filter-block"><span class="filter-label">납기 기준</span><select class="small-select" id="dueYearFilter"></select><div class="chip-group month-chips" id="dueMonthButtons"></div></div>
+</div>
+<div class="filter-line"><span class="filter-label">아이템</span><div class="chip-group item-chips" id="itemFilterButtons"><button class="filter-chip item-D" data-item="D" type="button">D</button><button class="filter-chip item-F" data-item="F" type="button">F</button><button class="filter-chip item-G" data-item="G" type="button">G</button><button class="filter-chip item-H" data-item="H" type="button">H</button><button class="filter-chip item-I" data-item="I" type="button">I</button><button class="filter-chip item-J" data-item="J" type="button">J</button><button class="filter-chip item-ETC" data-item="ETC" type="button">ETC</button></div><span class="filter-help">상태·월·아이템은 여러 개를 동시에 선택할 수 있습니다.</span></div>
+</article>
+<article class="panel orders-panel">
+<div class="panel-head orders-panel-head"><div><h2>발주 목록</h2><p><span id="resultCount">0건</span> · 검색 결과 금액 <strong id="filteredAmount">0</strong></p></div><label class="page-size-control">한 페이지<select id="pageSize"><option value="50">50건</option><option selected="" value="100">100건</option><option value="200">200건</option></select></label></div><div class="audit-order-banner" hidden id="auditOrderBanner"><div><strong id="auditOrderBannerTitle">데이터 점검에서 선택한 발주만 표시 중</strong><span id="auditOrderBannerText"></span></div><div class="audit-order-actions"><button class="button primary small" hidden id="ackAuditOrderButton" type="button">문제없음 확인</button><button class="button secondary small" id="clearAuditOrderFilterButton" type="button">일반 발주목록으로</button></div></div>
+<div class="table-scroll order-table-scroll"><table class="data-table order-table"><thead><tr><th class="check-column"><input id="selectAllVisible" type="checkbox"/></th><th>상태</th><th>업체</th><th>모델 · 수량</th><th class="number">TOTAL 금액</th><th>발주일</th><th>납기일</th><th>납품일</th><th>계산서</th><th>메모</th><th>작업</th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" hidden="" id="ordersEmpty"><strong>조건에 맞는 발주가 없습니다.</strong><span>검색어 또는 필터를 변경해주세요.</span></div></div>
+<div class="pagination"><button class="button secondary small" id="prevPage">이전</button><span id="pageInfo">1 / 1</span><button class="button secondary small" id="nextPage">다음</button></div>
+</article>
+<article class="panel audit-panel" id="auditPanel">
+<div class="panel-head"><div><h2>발주 데이터 및 금액 점검</h2><p>발주 및 납품 데이터의 날짜, 금액, 누락 항목과 중복 가능성을 점검합니다.</p></div><button class="button secondary" id="refreshAuditButton">다시 점검</button></div>
+<div class="audit-summary" id="auditSummary"></div><p class="audit-note" id="auditNote"></p>
+<div class="audit-tabs"><button class="audit-tab active" data-audit-tab="issues">확인 필요 항목</button><button class="audit-tab" data-audit-tab="duplicates">중복 가능 그룹</button></div>
+<div class="table-scroll audit-scroll"><table class="data-table"><thead id="auditTableHead"></thead><tbody id="auditTableBody"></tbody></table></div>
+</article></section>
+<section class="view-section" hidden="" id="performanceView">
+<div class="kpi-grid performance-kpis">
+<article class="kpi-card accent-violet"><div class="kpi-icon">B</div><div><span>올해 BUDGET</span><strong id="perfBudgetAmount">-</strong><small id="perfBudgetYearLabel">선택 연도</small></div></article>
+<article class="kpi-card accent-teal"><div class="kpi-icon">₩</div><div><span>현재 TOTAL 금액</span><strong id="perfInvoiceAmount">0</strong><small id="perfYearLabel">세금계산서 기준</small></div></article>
+<article class="kpi-card accent-orange"><div class="kpi-icon">%</div><div><span>달성율</span><strong id="perfAchievementRate">-</strong><small>BUDGET 대비 현재 TOTAL</small></div></article>
+<article class="kpi-card accent-indigo"><div class="kpi-icon">#</div><div><span>계산서 건수</span><strong id="perfInvoiceCount">0건</strong><small>발행일 입력 기준</small></div></article>
+<article class="kpi-card accent-blue"><div class="kpi-icon">C</div><div><span>거래업체 수</span><strong id="perfCustomerCount">0곳</strong><small>계산서 발행 거래처</small></div></article>
+</div>
+
+<article class="panel performance-item-panel">
+<div class="panel-head"><div><h2>ITEM별 실적</h2><p><strong>2026(2).xlsx 기준:</strong> 올해 BUDGET과 2·3분기 NEW BUDGET을 적용했습니다. 4분기 NEW BUDGET은 아래 ITEM별 BUDGET에서 업체별로 입력한 금액을 자동 합산합니다.</p></div><span class="reconcile-badge" id="itemReconcileBadge">금액 일치</span></div>
+<div class="table-scroll performance-item-scroll"><table class="data-table performance-item-table"><thead><tr><th>ITEM</th><th class="number">거래업체수</th><th class="number fixed-new-budget-head">올해<br>BUDGET</th><th class="number fixed-new-budget-head">2분기<br>NEW BUDGET</th><th class="number fixed-new-budget-head">3분기<br>NEW BUDGET</th><th class="number future-budget-head">4분기<br>NEW BUDGET<br><small>업체 합계</small></th><th class="number item-total-head">TOTAL 금액<br><small>(계산서)</small></th><th class="number">달성율<br><small>마지막 NEW BUDGET</small></th></tr></thead><tbody id="itemPerformanceBody"></tbody></table></div>
+</article>
+
+<article class="panel compact-bucket-panel"><div class="panel-head"><div><h2>거래금액별 업체</h2><p>세금계산서 기준 연간 거래금액 구간입니다. 버튼을 누르면 업체 상세가 표시됩니다.</p></div></div><div class="amount-bucket-grid compact" id="amountBucketGrid"></div></article>
+
+<article class="panel future-plan-panel">
+<div class="panel-head"><div><h2>ITEM별 BUDGET</h2><p><strong>2026(2).xlsx 기준 BUDGET 업체</strong>입니다. ETC를 선택하면 ETC BUDGET과 함께 올해 실제 세금계산서가 발행된 ETC 거래업체별 현재 TOTAL도 표시합니다. 4분기 NEW BUDGET을 입력하면 위 ITEM별 실적의 4분기 금액에 자동 합산됩니다.</p></div><span class="reconcile-badge" id="budgetPlanReconcileBadge">금액 확인중</span></div>
+<div class="item-budget-layout">
+<div class="plan-item-filters vertical" id="planItemFilters"></div>
+<div class="table-scroll future-plan-scroll"><table class="data-table future-plan-table"><thead><tr><th>업체</th><th class="number">올해 BUDGET</th><th class="number">2분기<br>NEW BUDGET</th><th class="number">3분기<br>NEW BUDGET</th><th class="number next-budget-head">4분기<br>NEW BUDGET<br><small>직접 입력</small></th><th class="number current-total-head">현재 TOTAL<br><small>세금계산서</small></th><th class="number">달성율<br><small>마지막 NEW BUDGET</small></th></tr></thead><tbody id="futurePlanBody"></tbody></table></div>
+</div>
+</article>
+
+<article class="panel yearly-analysis-panel">
+<div class="panel-head"><div><h2>연도별 업무분석</h2><p>첨부 Yearly meeting 자료와 실제 발주 데이터를 함께 반영했습니다. 견적 수와 업체 방문수는 변경하면 자동 저장됩니다.</p></div></div>
+<div class="table-scroll yearly-analysis-scroll"><table class="data-table yearly-table"><thead><tr><th>연도</th><th>견적 수</th><th>발주 건수</th><th>거래업체 수</th><th>업체 방문수</th><th>계산서 건수</th><th>TOTAL 금액<br><small>(세금계산서 기준)</small></th></tr></thead><tbody id="yearlyAnalysisBody"></tbody></table></div>
+<div class="yearly-chart-section">
+<div class="yearly-chart-title"><div><h3>연도별 TOTAL 금액</h3><p>세금계산서 기준 연간 금액을 비교합니다.</p></div></div>
+<div class="yearly-amount-chart" id="yearlyAmountChart"></div>
+</div>
+</article>
+
+
+</section><section class="view-section" hidden="" id="forecastView">
+
+<article class="panel meeting-section previous-result-panel">
+<div class="panel-head result-panel-head">
+<div class="result-title-block"><h2 id="previousResultTitle">월 결과</h2><p>세금계산서 발행일 기준 · 같은 업체는 묶고 ITEM별로 정리합니다.</p></div>
+<div class="meeting-summary-inline result-summary-inline"><span class="result-count-pill">계산서 <strong id="previousInvoiceCount">0건</strong></span><span class="result-total-pill">합계 <strong id="previousInvoiceAmount">0</strong></span></div>
+</div>
+<div class="meeting-month-filter">
+<label>연도<select id="resultYearFilter"></select></label>
+<div class="month-filter-chips" id="resultMonthButtons"></div>
+</div>
+<div class="meeting-result-layout">
+<div class="meeting-table-wrap">
+<table class="data-table meeting-table grouped-meeting-table">
+<thead><tr><th>거래처</th><th>ITEM</th><th>모델 · 수량</th><th class="number">ITEM 합계</th></tr></thead>
+<tbody id="previousResultBody"></tbody>
+</table>
+<div class="empty-state" hidden id="previousResultEmpty"><strong>선택한 월의 세금계산서 결과가 없습니다.</strong></div>
+</div>
+<aside class="result-item-summary">
+<div class="result-item-summary-head"><h3>ITEM별 합계</h3><p>0 금액 ITEM과 TOTAL 포함</p></div>
+<table class="data-table item-summary-table"><thead><tr><th>ITEM</th><th class="number">합계금액</th></tr></thead><tbody id="previousItemSummaryBody"></tbody></table>
+</aside>
+</div>
+</article>
+
+<article class="panel meeting-section forecast-panel">
+<div class="panel-head forecast-head">
+<div><h2 id="currentForecastTitle">월 예상</h2><p>월을 선택하면 예상이 자동 계산됩니다. 매월 반복 4건은 두 예상에 고정 표시되며, 계산서 예상에는 납품 완료·미계산서와 선택월까지 납기인 미계산서 발주가 자동 반영됩니다.</p></div>
+<div class="forecast-tools">
+<button class="button secondary" id="newForecastButton">+ 발주 예상 직접 추가</button>
+</div>
+</div>
+<div class="meeting-month-filter">
+<label>연도<select id="forecastYearFilter"></select></label>
+<div class="month-filter-chips" id="forecastMonthButtons"></div>
+</div>
+<div class="forecast-summary">
+<div><span>예상 원본 건수</span><strong id="forecastCount">0건</strong></div>
+<div class="forecast-total-card"><span>예상 총금액</span><strong id="forecastAmount">0</strong></div>
+<div class="forecast-recurring-card"><span>매월 반복 예상</span><strong id="recurringForecastAmount">0</strong></div>
+<div class="forecast-tabs"><button class="forecast-tab" data-forecast-type="order">발주 예상</button><button class="forecast-tab active" data-forecast-type="invoice">계산서 예상</button></div>
+</div>
+<div class="meeting-table-wrap">
+<table class="data-table meeting-table grouped-meeting-table forecast-meeting-table">
+<thead><tr><th>거래처</th><th>ITEM</th><th>모델 · 수량</th><th>구분 · 근거</th><th class="number">ITEM 합계</th><th>작업</th></tr></thead>
+<tbody id="forecastBody"></tbody>
+</table>
+<div class="empty-state" hidden id="forecastEmpty"><strong>선택한 월의 예상 내역이 없습니다.</strong></div>
+</div>
+</article>
+
+<article class="panel meeting-section monthly-plan-panel">
+<div class="panel-head"><div><h2 id="monthlyPlanTitle">월 주요 계획</h2><p>계획은 아래 월 필터별로 각각 저장됩니다.</p></div><button class="button primary" id="saveMonthlyPlanButton" type="button">계획 저장</button></div>
+<div class="meeting-month-filter plan-month-filter">
+<label>연도<select id="planYearFilter"></select></label>
+<div class="month-filter-chips" id="planMonthButtons"></div>
+</div>
+<div class="monthly-plan-body"><textarea id="monthlyPlanText" rows="8" placeholder="1. 주요 견적 진행, 고객 미팅, 납품 예정, 신규 프로젝트 대응 등"></textarea><span id="monthlyPlanSavedAt"></span></div>
+</article>
+</section>
+</div>
+</main>
+</div>
+<div class="bulk-bar" hidden="" id="bulkBar"><div><strong id="selectedCount">0건 선택</strong><span>선택 금액 <b id="selectedAmount">0</b></span></div><div><button class="button secondary" id="clearSelectionButton">선택 해제</button><button class="button delivery-button" id="bulkDeliveryButton">일괄 납품 완료</button><button class="button invoice-button" id="bulkInvoiceButton">일괄 계산서 완료</button></div></div>
+<dialog class="modal-dialog order-dialog" id="orderDialog">
+<form id="orderForm" method="dialog">
+<div class="dialog-head gradient-head"><div><p class="eyebrow">발주관리앱</p><h2 id="orderDialogTitle">신규 발주 등록</h2></div><button class="icon-button" data-close-dialog="orderDialog" type="button">×</button></div>
+<div class="form-grid">
+<div class="span-2 customer-entry-wrap"><label><span>업체명 *</span><input autocomplete="off" id="customer" required=""/></label><div class="autocomplete-list entry-autocomplete" hidden="" id="customerEntryAutocomplete"></div></div>
+<label class="span-2"><span>TOTAL 금액</span><input id="amount" inputmode="numeric" placeholder="0"/></label>
+<div class="span-4 item-group-builder"><div class="item-group-builder-head"><div><span>아이템별 모델·수량·금액 *</span><small>아이템을 먼저 선택한 뒤 해당 그룹의 금액과 모델·수량을 입력하세요.</small></div></div><div class="order-item-selector" id="orderItemSelector"><button class="item-select-button item-D" data-add-order-item="D" title="D" type="button"><b>D</b></button><button class="item-select-button item-F" data-add-order-item="F" title="F" type="button"><b>F</b></button><button class="item-select-button item-G" data-add-order-item="G" title="G" type="button"><b>G</b></button><button class="item-select-button item-H" data-add-order-item="H" title="H" type="button"><b>H</b></button><button class="item-select-button item-I" data-add-order-item="I" title="I" type="button"><b>I</b></button><button class="item-select-button item-J" data-add-order-item="J" title="J" type="button"><b>J</b></button><button class="item-select-button item-ETC" data-add-order-item="ETC" title="ETC" type="button"><b>ETC</b></button></div><div class="order-item-groups" id="orderItemGroups"></div><div class="item-empty-guide" id="orderItemEmptyGuide">위 아이템을 선택하면 모델·수량·금액 입력 그룹이 만들어집니다.</div><div class="item-amount-reconcile is-match" id="itemAmountReconcile"><span>아이템별 금액 합계</span><strong id="itemAmountSum">0</strong><em id="itemAmountStatus">TOTAL과 일치</em></div></div>
+<label><span>발주일 *</span><input class="date-picker-input" id="orderDate" required="" type="date"/></label><label><span>납기일 *</span><input class="date-picker-input" id="dueDate" required="" type="date"/></label><label><span>실제 납품일</span><input class="date-picker-input" id="deliveryDate" type="date"/></label><label><span>계산서 발행일</span><input class="date-picker-input" id="invoiceDate" type="date"/></label>
+
+<label class="span-4"><span>메모</span><textarea id="memo" placeholder="프로젝트, 납품장소, 담당자, 특이사항 등" rows="4"></textarea></label>
+<label class="span-2"><span>담당자</span><input id="owner" value="나"/></label>
+</div>
+<div class="dialog-actions"><button class="button danger-outline" hidden="" id="deleteButton" type="button">삭제</button><div><button class="button secondary" data-close-dialog="orderDialog" type="button">취소</button><button class="button primary" id="saveOrderButton" type="button">저장</button></div></div>
+</form>
+</dialog>
+<dialog class="modal-dialog small-dialog" id="completeDialog"><form id="completeForm" method="dialog"><div class="dialog-head gradient-head"><div><p class="eyebrow">COMPLETE DATE</p><h2 id="completeDialogTitle">완료 처리</h2></div><button class="icon-button" data-close-dialog="completeDialog" type="button">×</button></div><p class="complete-description" id="completeDescription"></p><label><span>처리 날짜</span><input class="date-picker-input" id="completeDate" required="" type="date"/></label><div class="dialog-actions right"><button class="button secondary" data-close-dialog="completeDialog" type="button">취소</button><button class="button primary" type="submit">처리</button></div></form></dialog>
+<dialog class="modal-dialog detail-dialog month-detail-dialog" id="monthDetailDialog" data-metric="invoice">
+<div class="detail-dialog-head month-detail-head"><div><p class="eyebrow" id="monthDetailEyebrow">INVOICE DETAIL</p><h2 id="monthDetailTitle">월별 세금계산서 거래처</h2><p id="monthDetailSubtitle"></p></div><button class="icon-button light" data-close-dialog="monthDetailDialog" type="button">×</button></div>
+<div class="detail-summary" id="monthDetailSummary"></div>
+<div class="detail-table-scroll"><table class="data-table detail-table"><thead><tr><th>거래처</th><th class="number" id="monthDetailCountHead">계산서 건수</th><th class="number" id="monthDetailAmountHead">계산서 금액</th></tr></thead><tbody id="monthDetailTableBody"></tbody></table></div>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="monthDetailDialog" type="button">닫기</button></div>
+</dialog>
+<dialog class="modal-dialog detail-dialog" id="bucketDialog"><div class="detail-dialog-head bucket-head"><div><p class="eyebrow">CUSTOMER AMOUNT</p><h2 id="bucketDialogTitle">거래금액별 업체</h2><p id="bucketDialogSubtitle"></p></div><button class="icon-button light" data-close-dialog="bucketDialog" type="button">×</button></div><div class="detail-table-scroll"><table class="data-table detail-table"><thead><tr><th class="number bucket-no-head">No.</th><th>업체</th><th class="number">계산서 건수</th><th class="number">계산서 금액</th></tr></thead><tbody id="bucketDialogBody"></tbody></table></div><div class="dialog-footer"><button class="button secondary" data-close-dialog="bucketDialog" type="button">닫기</button></div></dialog>
+<dialog class="modal-dialog detail-dialog item-performance-dialog" id="itemPerformanceDialog" data-item-theme="ETC">
+<div class="detail-dialog-head performance-detail-head item-performance-dialog-head"><div><p class="eyebrow">ITEM PERFORMANCE</p><h2 id="itemPerformanceDialogTitle">ITEM 거래처 실적</h2><p id="itemPerformanceDialogSubtitle"></p></div><button class="icon-button light" data-close-dialog="itemPerformanceDialog" type="button">×</button></div>
+<div class="detail-table-scroll"><table class="data-table detail-table"><thead><tr><th>거래처</th><th class="number">계산서 건수</th><th class="number">계산서 금액</th><th class="number">비중</th></tr></thead><tbody id="itemPerformanceDialogBody"></tbody></table></div>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="itemPerformanceDialog" type="button">닫기</button></div>
+</dialog>
+
+<dialog class="modal-dialog detail-dialog plan-etc-dialog" id="planEtcDialog" data-item-theme="ETC">
+<div class="detail-dialog-head plan-etc-dialog-head"><div><p class="eyebrow">ETC PERFORMANCE DETAIL</p><h2 id="planEtcDialogTitle">ETC 실적 거래업체</h2><p id="planEtcDialogSubtitle"></p></div><button class="icon-button light" data-close-dialog="planEtcDialog" type="button">×</button></div>
+<div class="plan-etc-summary" id="planEtcDialogSummary">
+<div><span>실적 거래업체</span><strong id="planEtcCustomerCount">0</strong></div>
+<div class="amount"><span>ETC 실적 합계</span><strong id="planEtcAmount">0</strong></div>
+</div>
+<div class="detail-table-scroll plan-etc-table-scroll"><table class="data-table detail-table plan-etc-detail-table"><thead><tr><th class="number bucket-no-head">No.</th><th>거래업체</th><th class="number">계산서 건수</th><th class="number">계산서 금액</th></tr></thead><tbody id="planEtcDialogBody"></tbody></table></div>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="planEtcDialog" type="button">닫기</button></div>
+</dialog>
+
+<dialog class="modal-dialog detail-dialog" id="forecastGroupDialog">
+<div class="detail-dialog-head"><div><p class="eyebrow">FORECAST DETAIL</p><h2>합산된 예상 내역</h2><p>개별 예상 내역을 선택해 수정할 수 있습니다.</p></div><button class="icon-button light" data-close-dialog="forecastGroupDialog" type="button">×</button></div>
+<div class="detail-table-scroll"><table class="data-table detail-table"><thead><tr><th>구분</th><th>업체</th><th>모델</th><th class="number">금액</th><th>작업</th></tr></thead><tbody id="forecastGroupDialogBody"></tbody></table></div>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="forecastGroupDialog" type="button">닫기</button></div>
+</dialog>
+<dialog class="modal-dialog compact-dialog" id="recurringForecastDialog">
+<form id="recurringForecastForm">
+<div class="dialog-head gradient-head"><div><p class="eyebrow">FIXED FORECAST</p><h2>고정 반복 예상 수정</h2><span class="recurring-month-badge" id="recurringEditMonthLabel"></span></div><button class="icon-button" data-close-dialog="recurringForecastDialog" type="button">×</button></div>
+<div class="form-grid recurring-edit-grid">
+<label class="span-2"><span>업체명 *</span><input id="recurringCustomer" required="" autocomplete="off"/></label>
+<label><span>ITEM *</span><select id="recurringItem"><option value="D">D - DEBEM</option><option value="F">F - FLUIMAC</option><option value="G">G - GRIFFCO</option><option value="H">H - HIDRACAR</option><option value="I">I - INJECTA</option><option value="J">J - JESSBERGER</option><option value="ETC">ETC</option></select></label>
+<label><span>수량 *</span><input id="recurringQuantity" min="1" required="" type="number"/></label>
+<label class="span-2"><span>모델 *</span><input id="recurringModel" required=""/></label>
+<label class="span-2"><span>금액 * <small class="unit-price-hint" id="recurringUnitPriceHint"></small></span><input id="recurringAmount" inputmode="numeric" required="" readonly="" placeholder="0"/></label>
+<label class="span-4"><span>근거</span><input value="매월 반복예상" disabled/></label>
+</div>
+<div class="dialog-actions"><span class="dialog-help-text">수정값은 선택한 해당 월의 발주예상·계산서예상에만 적용됩니다. 다른 월은 기본값을 사용합니다.</span><div><button class="button danger-outline" id="resetRecurringOverrideButton" type="button">이 달 기본값</button><button class="button secondary" data-close-dialog="recurringForecastDialog" type="button">취소</button><button class="button primary" type="submit">이 달 저장</button></div></div>
+</form>
+</dialog>
+<dialog class="modal-dialog order-dialog" id="forecastDialog">
+<form id="forecastForm" method="dialog">
+<div class="dialog-head gradient-head"><div><p class="eyebrow">ORDER FORECAST</p><h2 id="forecastDialogTitle">발주 예상 직접 추가</h2></div><button class="icon-button" data-close-dialog="forecastDialog" type="button">×</button></div>
+<input id="forecastType" type="hidden" value="order"/>
+<div class="form-grid">
+<label id="forecastEntryMonthLabel"><span id="forecastEntryMonthText">발주 예상월 *</span><input class="month-picker-input" id="forecastEntryMonth" required="" type="month"/></label>
+<label id="forecastInvoiceMonthLabel"><span>계산서 예상월</span><input class="month-picker-input" id="forecastInvoiceMonth" type="month"/></label>
+<div class="span-2 customer-entry-wrap"><label><span>업체명 *</span><input autocomplete="off" id="forecastCustomer" required=""/></label><div class="autocomplete-list entry-autocomplete" hidden="" id="forecastCustomerAutocomplete"></div></div>
+<label class="span-2"><span>예상 금액</span><input id="forecastEntryAmount" inputmode="numeric" placeholder="0"/></label>
+<div class="span-4 item-group-builder forecast-item-builder">
+<div class="item-group-builder-head"><div><span>아이템별 모델 · 수량 *</span><small>발주 등록과 동일하게 ITEM을 먼저 선택한 뒤 모델과 수량을 추가하세요.</small></div></div>
+<div class="order-item-selector" id="forecastItemSelector"><button class="item-select-button item-D" data-add-forecast-item="D" type="button"><b>D</b></button><button class="item-select-button item-F" data-add-forecast-item="F" type="button"><b>F</b></button><button class="item-select-button item-G" data-add-forecast-item="G" type="button"><b>G</b></button><button class="item-select-button item-H" data-add-forecast-item="H" type="button"><b>H</b></button><button class="item-select-button item-I" data-add-forecast-item="I" type="button"><b>I</b></button><button class="item-select-button item-J" data-add-forecast-item="J" type="button"><b>J</b></button><button class="item-select-button item-ETC" data-add-forecast-item="ETC" type="button"><b>ETC</b></button></div>
+<div class="forecast-item-groups order-item-groups" id="forecastItemGroups"></div><div class="item-empty-guide" id="forecastItemEmptyGuide">위 ITEM을 선택하면 모델·수량 입력 그룹이 만들어집니다.</div>
+</div>
+<label class="span-4"><span>메모</span><textarea id="forecastNote" rows="3"></textarea></label>
+</div>
+<div class="dialog-actions"><button class="button danger-outline" hidden="" id="deleteForecastButton" type="button">삭제</button><div><button class="button secondary" data-close-dialog="forecastDialog" type="button">취소</button><button class="button primary" type="submit">저장</button></div></div>
+</form>
+</dialog>
+<dialog class="modal-dialog backup-manager-dialog" id="backupManagerDialog">
+<div class="dialog-head gradient-head"><div><p class="eyebrow">DATA SAFETY</p><h2>백업 관리</h2><p>자동·수동 백업을 확인하고 필요한 시점으로 복원합니다.</p></div><button class="icon-button" data-close-dialog="backupManagerDialog" type="button">×</button></div>
+<div class="backup-manager-actions"><button class="button primary" id="dialogNowBackupButton" type="button">지금 백업</button><button class="button secondary" id="refreshBackupListButton" type="button">목록 새로고침</button></div>
+<div class="backup-list-scroll">
+<table class="data-table backup-list-table"><thead><tr><th>백업 날짜</th><th>백업 시간</th><th>구분</th><th class="number">파일 크기</th><th>작업</th></tr></thead><tbody id="backupListBody"></tbody></table>
+<div class="empty-state" hidden id="backupListEmpty"><strong>저장된 백업이 없습니다.</strong><span>지금 백업을 눌러 첫 백업을 만들 수 있습니다.</span></div>
+</div>
+<p class="backup-manager-note">복원 직전 현재 상태를 별도로 보관한 뒤 안전하게 복원합니다. 수동백업과 복원 전 백업은 자동 삭제되지 않습니다.</p>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="backupManagerDialog" type="button">닫기</button></div>
+</dialog>
+<dialog class="modal-dialog submission-dialog" id="submissionDialog">
+<div class="dialog-head submission-dialog-head"><div><p class="eyebrow">OFFLINE READ-ONLY REPORT</p><h2>대표님 제출용 HTML 파일</h2><p>이메일에 첨부할 수 있는 파일 하나로 현재 데이터를 고정합니다.</p></div><button class="icon-button" data-close-dialog="submissionDialog" type="button">×</button></div>
+<div class="submission-dialog-body">
+<section class="submission-create-box standalone-create-box">
+<label><span>제출본 이름</span><input id="submissionTitle" placeholder="예: 2026년 8월 월간회의 제출본"/></label>
+<div class="standalone-benefits">
+<div><strong>PC가 꺼져도 열림</strong><span>대표님 PC에서 HTML 파일을 더블클릭하면 됩니다.</span></div>
+<div><strong>제출 시점 데이터 고정</strong><span>이후 원본 앱을 수정해도 제출 파일 내용은 변하지 않습니다.</span></div>
+<div><strong>조회 버튼 사용 가능</strong><span>통합분석 · 연간실적 · 월간회의의 연도/월/ITEM/팝업을 사용할 수 있습니다.</span></div>
+</div>
+<button class="button primary standalone-download-button" id="createSubmissionHtmlButton" type="button">HTML 파일 만들기</button>
+<p class="submission-html-note" id="submissionHtmlStatus">생성된 .html 파일을 이메일에 첨부해 보내시면 됩니다.</p>
+</section>
+</div>
+<div class="dialog-footer"><button class="button secondary" data-close-dialog="submissionDialog" type="button">닫기</button></div>
+</dialog>
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+<script src="/vendor/xlsx.full.min.js"></script>
+<script src="/app.js?v=64.0.0" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+[
+  { "year": 2026, "item": "D", "budget": 660000000, "q2_new_budget": 654600000, "q3_new_budget": 616690000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "F", "budget": 845000000, "q2_new_budget": 865000000, "q3_new_budget": 835000000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "G", "budget": 126000000, "q2_new_budget": 133000000, "q3_new_budget": 148990000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "H", "budget": 140000000, "q2_new_budget": 161000000, "q3_new_budget": 241600000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "I", "budget": 10000000, "q2_new_budget": 10000000, "q3_new_budget": 15000000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "J", "budget": 85000000, "q2_new_budget": 95000000, "q3_new_budget": 75000000, "q4_new_budget": null, "source": "2026(2).xlsx" },
+  { "year": 2026, "item": "ETC", "budget": 40000000, "q2_new_budget": 30000000, "q3_new_budget": 5000000, "q4_new_budget": null, "source": "2026(2).xlsx" }
+]
