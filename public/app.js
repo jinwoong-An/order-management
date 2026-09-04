@@ -42,8 +42,8 @@ function orderTotal(o) {
 }
 function statusOf(o) {
   if (o.invoiceDate) return "complete";
-  if (o.deliveryDate) return "invoice_pending";
-  return "in_progress";
+  // 계산서 일자가 없으면(납품 여부와 무관하게) 계산서 대기
+  return "invoice_pending";
 }
 const STATUS_LABEL = { in_progress: "진행 중", invoice_pending: "계산서 대기", complete: "처리 완료" };
 
