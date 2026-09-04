@@ -74,6 +74,17 @@ const API = {
     });
   },
 
+  // 앱 시작 시 모든 컬렉션을 한 번에 반환 (호출 수/콜드스타트 최소화)
+  "GET /api/bootstrap": async (_req, res) => {
+    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans] =
+      await Promise.all([
+        readCollection("orders"), readCollection("annualMetrics"), readCollection("planValues"),
+        readCollection("recurringForecasts"), readCollection("forecasts"), readCollection("monthlyPlans"),
+        readCollection("yearlyAnalysis"), readCollection("customerPlans"),
+      ]);
+    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans });
+  },
+
   "GET /api/orders": async (_req, res) => sendJson(res, 200, await readCollection("orders")),
   "POST /api/orders": async (req, res) => {
     const body = await readBody(req);

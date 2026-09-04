@@ -131,17 +131,17 @@ function toast(msg, kind = "info") {
  * 데이터 로드
  * =======================================================*/
 async function refreshAll() {
-  const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis] =
-    await Promise.all([
-      api("/api/orders"),
-      api("/api/annual-metrics"),
-      api("/api/plan-values"),
-      api("/api/recurring-forecasts"),
-      api("/api/forecasts"),
-      api("/api/monthly-plans"),
-      api("/api/yearly-analysis"),
-    ]);
-  Object.assign(store, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis });
+  // 단일 호출로 모든 데이터 로드 (콜드스타트/왕복 최소화)
+  const d = await api("/api/bootstrap");
+  Object.assign(store, {
+    orders: d.orders || [],
+    annualMetrics: d.annualMetrics || [],
+    planValues: d.planValues || [],
+    recurringForecasts: d.recurringForecasts || [],
+    forecasts: d.forecasts || [],
+    monthlyPlans: d.monthlyPlans || [],
+    yearlyAnalysis: d.yearlyAnalysis || [],
+  });
   ensureRecurringDefaults();
 }
 

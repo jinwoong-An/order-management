@@ -4,6 +4,7 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": "public",
+  "regions": ["icn1"],
   "functions": {
     "api/index.js": {
       "maxDuration": 30

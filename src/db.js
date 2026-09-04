@@ -84,11 +84,9 @@ async function ensureDirs() {
  * =======================================================*/
 export async function init() {
   if (USE_SUPABASE) {
-    // 각 컬렉션 행이 없으면 시드로 생성
-    for (const name of COLLECTION_NAMES) {
-      const existing = await sbSelectCollection(name);
-      if (existing === null) await sbUpsertCollection(name, SEED[name] ?? []);
-    }
+    // Supabase는 스키마 SQL(supabase-schema.sql)에서 이미 시드됨.
+    // 매 요청마다 8회 존재 확인을 하면 느려지므로 여기서는 아무것도 하지 않는다.
+    // (행이 없어도 readCollection은 []를 반환하고, writeCollection이 upsert로 생성함)
     return;
   }
   await ensureDirs();
