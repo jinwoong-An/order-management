@@ -296,7 +296,7 @@ function renderOrders() {
         <td class="model-cell">${items || "-"}</td>
         <td class="number">${won(orderTotal(o))}</td>
         <td>${o.orderDate || "-"}</td>
-        <td>${o.dueDate || "-"}</td>
+        <td>${o.dueDate || '<span class="stock-badge">재고 보유</span>'}</td>
         <td>${o.deliveryDate || '<span class="muted">-</span>'}</td>
         <td>${o.invoiceDate || '<span class="muted">-</span>'}</td>
         <td class="memo-cell" title="${escapeHtml(o.memo || "")}">${escapeHtml((o.memo || "").slice(0, 24))}</td>
@@ -336,7 +336,7 @@ function computeAudit() {
     const problems = [];
     if (!o.customer) problems.push("업체명 없음");
     if (!o.orderDate) problems.push("발주일 없음");
-    if (!o.dueDate) problems.push("납기일 없음");
+    // 납기일 없음 = 재고 보유 제품이므로 정상 (문제로 보지 않음)
     if (orderTotal(o) <= 0) problems.push("금액 0 또는 누락");
     if (o.deliveryDate && o.orderDate && o.deliveryDate < o.orderDate) problems.push("납품일이 발주일보다 빠름");
     if (o.invoiceDate && !o.deliveryDate) problems.push("계산서 있으나 납품일 없음");
