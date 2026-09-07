@@ -546,10 +546,10 @@ function renderPerformance() {
 }
 
 const BUCKETS = [
-  { key: "b1", label: "1억원 이상", min: 100000000, max: Infinity },
-  { key: "b2", label: "5천만~1억원", min: 50000000, max: 100000000 },
-  { key: "b3", label: "1천만~5천만원", min: 10000000, max: 50000000 },
-  { key: "b4", label: "1천만원 미만", min: 0, max: 10000000 },
+  { key: "b1", label: "5천만~1억원", min: 50000000, max: 100000000 },
+  { key: "b2", label: "1천만~5천만원", min: 10000000, max: 50000000 },
+  { key: "b3", label: "100만~1천만원", min: 1000000, max: 10000000 },
+  { key: "b4", label: "100만원 미만", min: 0, max: 1000000 },
 ];
 function customerInvoiceTotals(year) {
   const map = new Map();
