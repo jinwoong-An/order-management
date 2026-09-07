@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.0.3" rel="stylesheet"/>
+<link href="/styles.css?v=64.0.4" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -88,6 +88,7 @@
 <section class="view-section" id="ordersView">
 <div class="status-overview" id="statusOverview"></div>
 <article class="panel filter-panel">
+<div class="filter-line order-year-line"><span class="filter-label">발주 연도</span><select class="small-select" id="orderYearFilter"></select><span class="filter-help">발주일(발주 받은 날) 기준 · 기본값은 올해</span></div>
 <div class="search-row">
 <div class="autocomplete-wrap">
 <label class="search-box"><svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input autocomplete="off" id="searchInput" placeholder="업체명, 모델, 메모, 발주번호 통합검색" type="search"/><button class="clear-search" id="clearSearchButton" type="button">×</button></label>
@@ -316,6 +317,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.0.3" type="module"></script>
+<script src="/app.js?v=64.0.4" type="module"></script>
 </body>
 </html>

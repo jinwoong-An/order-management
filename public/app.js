@@ -91,6 +91,7 @@ const ui = {
   year: new Date().getFullYear(),
   // 발주 필터
   search: "",
+  orderYear: new Date().getFullYear(), // 발주 목록 기본 연도 = 올해
   statusFilter: new Set(),
   itemFilter: new Set(),
   dueYear: "",
@@ -201,6 +202,8 @@ function renderView() {
  * =======================================================*/
 function filteredOrders() {
   let rows = store.orders.slice();
+  // 발주 연도 필터 (발주일 기준, 기본값 올해)
+  if (ui.orderYear !== "all") rows = rows.filter((o) => yearOf(o.orderDate) === Number(ui.orderYear));
   const q = ui.search.trim().toLowerCase();
   if (q) {
     rows = rows.filter((o) => {
@@ -215,8 +218,25 @@ function filteredOrders() {
   if (ui.itemFilter.size) rows = rows.filter((o) => (o.items || []).some((it) => ui.itemFilter.has(it.item)));
   if (ui.dueYear) rows = rows.filter((o) => yearOf(o.dueDate) === Number(ui.dueYear));
   if (ui.dueMonths.size) rows = rows.filter((o) => ui.dueMonths.has(monthOf(o.dueDate)));
-  rows.sort((a, b) => String(b.orderDate || "").localeCompare(String(a.orderDate || "")));
+  // 발주 받은 순서 = 발주일 오름차순 (날짜 없는 건은 뒤로), 같은 날짜는 입력순
+  rows.sort((a, b) => {
+    const da = a.orderDate || "9999-99-99";
+    const db = b.orderDate || "9999-99-99";
+    if (da !== db) return da < db ? -1 : 1;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
   return rows;
+}
+
+function populateOrderYearFilter() {
+  const sel = $("orderYearFilter");
+  if (!sel) return;
+  const years = availableYears();
+  sel.innerHTML = `<option value="all">전체 연도</option>` +
+    years.map((y) => `<option value="${y}">${y}년</option>`).join("");
+  // 올해가 목록에 없으면 전체로
+  if (ui.orderYear !== "all" && !years.includes(Number(ui.orderYear))) ui.orderYear = "all";
+  sel.value = String(ui.orderYear);
 }
 
 function renderStatusOverview() {
@@ -244,6 +264,7 @@ function renderStatusOverview() {
 }
 
 function renderOrders() {
+  populateOrderYearFilter();
   renderStatusOverview();
   // 상태/아이템 칩 활성화 표시
   $$("#statusFilterButtons .filter-chip").forEach((b) => b.classList.toggle("active", ui.statusFilter.has(b.dataset.status)));
@@ -1347,11 +1368,13 @@ function bindEvents() {
   $("analysisYear").addEventListener("change", (e) => { ui.year = Number(e.target.value); renderView(); });
 
   /* ---- 발주 목록 상호작용 ---- */
+  $("orderYearFilter").addEventListener("change", (e) => { ui.orderYear = e.target.value; ui.page = 1; renderOrders(); });
   $("searchInput").addEventListener("input", (e) => { ui.search = e.target.value; ui.page = 1; renderOrders(); });
   $("clearSearchButton").addEventListener("click", () => { ui.search = ""; $("searchInput").value = ""; renderOrders(); });
   $("resetFilterButton").addEventListener("click", () => {
     ui.search = ""; $("searchInput").value = "";
     ui.statusFilter.clear(); ui.itemFilter.clear(); ui.dueMonths.clear(); ui.dueYear = "";
+    ui.orderYear = new Date().getFullYear();
     ui.page = 1; initDueFilters(); renderOrders();
   });
   $("statusFilterButtons").addEventListener("click", (e) => {
