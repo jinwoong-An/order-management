@@ -242,7 +242,11 @@ function populateOrderYearFilter() {
 function renderStatusOverview() {
   const counts = { in_progress: 0, invoice_pending: 0, complete: 0 };
   let amount = { in_progress: 0, invoice_pending: 0, complete: 0 };
-  for (const o of store.orders) {
+  // 선택한 발주 연도(발주일 기준)만 집계
+  const yearOrders = ui.orderYear === "all"
+    ? store.orders
+    : store.orders.filter((o) => yearOf(o.orderDate) === Number(ui.orderYear));
+  for (const o of yearOrders) {
     const s = statusOf(o);
     counts[s] += 1;
     amount[s] += orderTotal(o);
