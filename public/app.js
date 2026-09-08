@@ -42,6 +42,14 @@ const monthOf = (d) => {
   return m >= 1 && m <= 12 ? m : null;
 };
 const todayStr = () => new Date().toISOString().slice(0, 10);
+function addMonths(dateStr, n) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return "";
+  d.setMonth(d.getMonth() + n);
+  const p = (x) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 function orderTotal(o) {
   const a = parseNum(o.amount);
@@ -932,6 +940,8 @@ function renderMonthChips(id, selected, onChange) {
 let orderItemsDraft = [];
 // 계산서 발행일이 납품일을 자동으로 따라갈지 여부 (사용자가 계산서일을 직접 수정하면 해제)
 let invoiceLinked = true;
+// 납기일이 발주일+2개월을 자동으로 따라갈지 여부 (사용자가 납기일을 직접 수정하면 해제)
+let dueLinked = true;
 function renderOrderItemGroups() {
   const box = $("orderItemGroups");
   $("orderItemEmptyGuide").hidden = orderItemsDraft.length > 0;
@@ -972,11 +982,19 @@ function openOrderDialog(order) {
   $("amount").value = order?.amount ? won(order.amount) : "";
   $("discount").value = order?.discount ? won(order.discount) : "";
   $("orderDate").value = order?.orderDate || todayStr();
-  $("dueDate").value = order?.dueDate || "";
   // 기존 발주에 납기일이 없으면 '재고 있어 바로'로 표시
   const dueIsStock = order ? !order.dueDate : false;
   $("dueStock").checked = dueIsStock;
   $("dueDate").disabled = dueIsStock;
+  if (order) {
+    // 기존 발주는 저장된 납기일 유지, 자동연동 해제
+    $("dueDate").value = order.dueDate || "";
+    dueLinked = false;
+  } else {
+    // 신규는 발주일 + 2개월 자동 설정, 자동연동 유지
+    $("dueDate").value = dueIsStock ? "" : addMonths($("orderDate").value, 2);
+    dueLinked = true;
+  }
   $("deliveryDate").value = order?.deliveryDate || "";
   $("invoiceDate").value = order?.invoiceDate || "";
   // 신규거나, 계산서일이 납품일과 같으면 자동 연동 유지. 다르면 연동 해제(각각 유지).
@@ -1471,6 +1489,9 @@ function bindEvents() {
     const btn = e.target.closest("[data-add-order-item]"); if (!btn) return;
     orderItemsDraft.push({ item: btn.dataset.addOrderItem, model: "", quantity: null, amount: 0 });
     renderOrderItemGroups();
+    // 방금 추가된 그룹의 모델명 입력칸으로 커서 이동
+    const models = $("orderItemGroups").querySelectorAll(".ig-model");
+    if (models.length) models[models.length - 1].focus();
   });
   $("orderItemGroups").addEventListener("input", (e) => {
     const idx = Number(e.target.dataset.group);
@@ -1495,11 +1516,20 @@ function bindEvents() {
     if (invoiceLinked && $("deliveryDate").value) $("invoiceDate").value = $("deliveryDate").value;
   });
   $("invoiceDate").addEventListener("change", () => { invoiceLinked = false; });
-  // '재고 있어 바로' 체크 시 납기일 입력 비활성화(납기 없음)
+  // 발주일 변경 시 납기일 = 발주일 + 2개월 자동 (사용자가 납기일 직접 수정 전까지)
+  $("orderDate").addEventListener("change", () => {
+    if (dueLinked && !$("dueStock").checked && $("orderDate").value) {
+      $("dueDate").value = addMonths($("orderDate").value, 2);
+    }
+  });
+  // 납기일 직접 수정 시 자동연동 해제
+  $("dueDate").addEventListener("change", () => { dueLinked = false; });
+  // '재고 있어 바로' 체크 시 납기일 입력 비활성화(납기 없음), 해제 시 발주일+2개월 복원
   $("dueStock").addEventListener("change", () => {
     const on = $("dueStock").checked;
     $("dueDate").disabled = on;
     if (on) $("dueDate").value = "";
+    else if (dueLinked) $("dueDate").value = addMonths($("orderDate").value, 2);
   });
   $("saveOrderButton").addEventListener("click", saveOrder);
   $("deleteButton").addEventListener("click", deleteOrder);
