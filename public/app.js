@@ -1360,6 +1360,19 @@ function bindEvents() {
   $("restoreButton").addEventListener("click", () => $("restoreFile").click());
   $("restoreFile").addEventListener("change", (e) => { if (e.target.files[0]) restoreFromFile(e.target.files[0]); e.target.value = ""; });
   $("submissionButton").addEventListener("click", () => $("submissionDialog").showModal());
+  $("clearOrdersButton").addEventListener("click", async () => {
+    if (!confirm("정말 모든 발주(납품·계산서 포함)를 삭제하고 처음부터 다시 입력하시겠어요?\n\n(BUDGET·월 계획은 유지됩니다. 되돌리려면 '백업 목록·복원'을 사용하세요.)")) return;
+    if (!confirm("한 번 더 확인합니다. 발주 전체를 삭제합니다. 계속할까요?")) return;
+    try {
+      const r = await api("/api/orders/clear", { method: "POST" });
+      ui.selected.clear();
+      await refreshAll();
+      renderView();
+      toast(`발주 ${r.cleared}건을 삭제했습니다. 이제 처음부터 입력하세요.`, "success");
+    } catch (e) {
+      toast("삭제 실패: " + e.message, "error");
+    }
+  });
   $("createSubmissionHtmlButton").addEventListener("click", createSubmissionHtml);
   $("importButton").addEventListener("click", () => $("excelFile").click());
   $("excelFile").addEventListener("change", (e) => { if (e.target.files[0]) importExcel(e.target.files[0]); e.target.value = ""; });

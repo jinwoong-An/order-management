@@ -82,6 +82,8 @@ small { font-size: 12px; }
 .sidebar-tool:hover { background: rgba(255,255,255,.12); color: #fff; }
 .backup-primary-tool { background: rgba(85,101,242,.25); border-color: rgba(85,101,242,.4); color: #fff; }
 .submission-create-tool { background: rgba(139,67,232,.22); border-color: rgba(139,67,232,.4); color: #fff; }
+.danger-tool { background: rgba(229,84,75,.16); border-color: rgba(229,84,75,.4); color: #ffb3ad; }
+.danger-tool:hover { background: rgba(229,84,75,.3); color: #fff; }
 
 .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 10px 6px 0; border-top: 1px solid rgba(255,255,255,.08); }
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; }

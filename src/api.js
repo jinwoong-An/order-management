@@ -110,6 +110,12 @@ const API = {
     await writeCollection("orders", next);
     sendJson(res, 200, { ok: true, removed: rows.length - next.length });
   },
+  "POST /api/orders/clear": async (_req, res) => {
+    const before = (await readCollection("orders")).length;
+    await createBackup("pre-restore");
+    await writeCollection("orders", []);
+    sendJson(res, 200, { ok: true, cleared: before });
+  },
   "POST /api/orders/bulk": async (req, res) => {
     const body = await readBody(req);
     const ids = new Set(body.ids || []);
