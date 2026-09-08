@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.0.7" rel="stylesheet"/>
+<link href="/styles.css?v=64.0.8" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -218,7 +218,7 @@
 <div class="dialog-head gradient-head"><div><p class="eyebrow">발주관리앱</p><h2 id="orderDialogTitle">신규 발주 등록</h2></div><button class="icon-button" data-close-dialog="orderDialog" type="button">×</button></div>
 <div class="form-grid">
 <div class="span-2 customer-entry-wrap"><label><span>업체명 *</span><input autocomplete="off" id="customer" required=""/></label><div class="autocomplete-list entry-autocomplete" hidden="" id="customerEntryAutocomplete"></div></div>
-<label class="span-2"><span>TOTAL 금액</span><input id="amount" inputmode="numeric" placeholder="0"/></label>
+<label><span>TOTAL 금액</span><input id="amount" inputmode="numeric" placeholder="0"/></label><label><span>할인 (DISCOUNT)</span><input id="discount" inputmode="numeric" placeholder="0"/></label>
 <div class="span-4 item-group-builder"><div class="item-group-builder-head"><div><span>아이템별 모델·수량·금액 *</span><small>아이템을 먼저 선택한 뒤 해당 그룹의 금액과 모델·수량을 입력하세요.</small></div></div><div class="order-item-selector" id="orderItemSelector"><button class="item-select-button item-D" data-add-order-item="D" title="D" type="button"><b>D</b></button><button class="item-select-button item-F" data-add-order-item="F" title="F" type="button"><b>F</b></button><button class="item-select-button item-G" data-add-order-item="G" title="G" type="button"><b>G</b></button><button class="item-select-button item-H" data-add-order-item="H" title="H" type="button"><b>H</b></button><button class="item-select-button item-I" data-add-order-item="I" title="I" type="button"><b>I</b></button><button class="item-select-button item-J" data-add-order-item="J" title="J" type="button"><b>J</b></button><button class="item-select-button item-ETC" data-add-order-item="ETC" title="ETC" type="button"><b>ETC</b></button></div><div class="order-item-groups" id="orderItemGroups"></div><div class="item-empty-guide" id="orderItemEmptyGuide">위 아이템을 선택하면 모델·수량·금액 입력 그룹이 만들어집니다.</div><div class="item-amount-reconcile is-match" id="itemAmountReconcile"><span>아이템별 금액 합계</span><strong id="itemAmountSum">0</strong><em id="itemAmountStatus">TOTAL과 일치</em></div></div>
 <label><span>발주일 *</span><input class="date-picker-input" id="orderDate" required="" type="date"/></label><label><span>납기일 *</span><input class="date-picker-input" id="dueDate" required="" type="date"/></label><label><span>실제 납품일</span><input class="date-picker-input" id="deliveryDate" type="date"/></label><label><span>계산서 발행일</span><input class="date-picker-input" id="invoiceDate" type="date"/></label>
 
@@ -318,6 +318,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.0.7" type="module"></script>
+<script src="/app.js?v=64.0.8" type="module"></script>
 </body>
 </html>

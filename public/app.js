@@ -27,6 +27,14 @@ const parseNum = (v) => {
   const n = Number(String(v).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
+// 천단위 콤마 포맷 + 마이너스(-) 입력 허용
+function formatMoney(value) {
+  let s = String(value).replace(/[^0-9-]/g, "");
+  const neg = s.startsWith("-");
+  s = s.replace(/-/g, "");
+  if (s === "") return neg ? "-" : "";
+  return (neg ? "-" : "") + won(Number(s));
+}
 const yearOf = (d) => (d ? Number(String(d).slice(0, 4)) || null : null);
 const monthOf = (d) => {
   if (!d) return null;
@@ -937,17 +945,21 @@ function renderOrderItemGroups() {
 }
 function updateItemReconcile() {
   const sum = orderItemsDraft.reduce((s, g) => s + parseNum(g.amount), 0);
+  const discount = parseNum($("discount").value);
+  const net = sum - discount;
+  $("itemAmountSum").textContent = discount
+    ? `${won(sum)} − 할인 ${won(discount)} = ${won(net)}`
+    : won(sum);
   const total = parseNum($("amount").value);
-  $("itemAmountSum").textContent = won(sum);
   const box = $("itemAmountReconcile");
   if (!total) {
-    $("itemAmountStatus").textContent = "TOTAL 미입력";
+    $("itemAmountStatus").textContent = discount ? "할인 적용가로 저장됩니다" : "TOTAL 미입력";
     box.className = "item-amount-reconcile";
-  } else if (Math.abs(sum - total) <= 1) {
+  } else if (Math.abs(net - total) <= 1) {
     $("itemAmountStatus").textContent = "TOTAL과 일치";
     box.className = "item-amount-reconcile is-match";
   } else {
-    $("itemAmountStatus").textContent = `차이 ${won(total - sum)}`;
+    $("itemAmountStatus").textContent = `차이 ${won(total - net)}`;
     box.className = "item-amount-reconcile is-diff";
   }
 }
@@ -956,6 +968,7 @@ function openOrderDialog(order) {
   $("orderDialogTitle").textContent = order ? "발주 수정" : "신규 발주 등록";
   $("customer").value = order?.customer || "";
   $("amount").value = order?.amount ? won(order.amount) : "";
+  $("discount").value = order?.discount ? won(order.discount) : "";
   $("orderDate").value = order?.orderDate || todayStr();
   $("dueDate").value = order?.dueDate || "";
   $("deliveryDate").value = order?.deliveryDate || "";
@@ -978,11 +991,12 @@ async function saveOrder() {
   const items = orderItemsDraft.map((g) => ({
     item: g.item, model: g.model || "", quantity: parseNum(g.quantity) || null, amount: parseNum(g.amount) || 0,
   }));
+  const discount = parseNum($("discount").value);
   let amount = parseNum($("amount").value);
-  if (!amount) amount = items.reduce((s, it) => s + it.amount, 0);
+  if (!amount) amount = items.reduce((s, it) => s + it.amount, 0) - discount;
 
   const payload = {
-    customer, amount, items, orderDate, dueDate,
+    customer, amount, discount, items, orderDate, dueDate,
     deliveryDate: $("deliveryDate").value || null,
     invoiceDate: $("invoiceDate").value || null,
     memo: $("memo").value.trim(),
@@ -1455,8 +1469,8 @@ function bindEvents() {
     if (e.target.classList.contains("ig-model")) orderItemsDraft[idx].model = e.target.value;
     if (e.target.classList.contains("ig-qty")) orderItemsDraft[idx].quantity = e.target.value;
     if (e.target.classList.contains("ig-amount")) {
+      e.target.value = formatMoney(e.target.value);
       orderItemsDraft[idx].amount = parseNum(e.target.value);
-      e.target.value = orderItemsDraft[idx].amount ? won(orderItemsDraft[idx].amount) : "";
     }
     updateItemReconcile();
   });
@@ -1465,7 +1479,8 @@ function bindEvents() {
     orderItemsDraft.splice(Number(rm.dataset.group), 1);
     renderOrderItemGroups();
   });
-  $("amount").addEventListener("input", () => { const n = parseNum($("amount").value); $("amount").value = n ? won(n) : ""; updateItemReconcile(); });
+  $("amount").addEventListener("input", () => { $("amount").value = formatMoney($("amount").value); updateItemReconcile(); });
+  $("discount").addEventListener("input", () => { $("discount").value = formatMoney($("discount").value); updateItemReconcile(); });
   $("saveOrderButton").addEventListener("click", saveOrder);
   $("deleteButton").addEventListener("click", deleteOrder);
 
