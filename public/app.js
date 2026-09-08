@@ -930,6 +930,8 @@ function renderMonthChips(id, selected, onChange) {
  * 발주 등록/수정 다이얼로그
  * =======================================================*/
 let orderItemsDraft = [];
+// 계산서 발행일이 납품일을 자동으로 따라갈지 여부 (사용자가 계산서일을 직접 수정하면 해제)
+let invoiceLinked = true;
 function renderOrderItemGroups() {
   const box = $("orderItemGroups");
   $("orderItemEmptyGuide").hidden = orderItemsDraft.length > 0;
@@ -973,6 +975,8 @@ function openOrderDialog(order) {
   $("dueDate").value = order?.dueDate || "";
   $("deliveryDate").value = order?.deliveryDate || "";
   $("invoiceDate").value = order?.invoiceDate || "";
+  // 신규거나, 계산서일이 납품일과 같으면 자동 연동 유지. 다르면 연동 해제(각각 유지).
+  invoiceLinked = !order || !order.invoiceDate || order.invoiceDate === order.deliveryDate;
   $("memo").value = order?.memo || "";
   $("owner").value = order?.owner || "나";
   orderItemsDraft = (order?.items || []).map((it) => ({ ...it }));
@@ -1481,6 +1485,11 @@ function bindEvents() {
   });
   $("amount").addEventListener("input", () => { $("amount").value = formatMoney($("amount").value); updateItemReconcile(); });
   $("discount").addEventListener("input", () => { $("discount").value = formatMoney($("discount").value); updateItemReconcile(); });
+  // 납품일 입력 시 계산서 발행일 자동 동기화 (사용자가 계산서일을 직접 바꾸기 전까지)
+  $("deliveryDate").addEventListener("change", () => {
+    if (invoiceLinked && $("deliveryDate").value) $("invoiceDate").value = $("deliveryDate").value;
+  });
+  $("invoiceDate").addEventListener("change", () => { invoiceLinked = false; });
   $("saveOrderButton").addEventListener("click", saveOrder);
   $("deleteButton").addEventListener("click", deleteOrder);
 
