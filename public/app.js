@@ -973,6 +973,10 @@ function openOrderDialog(order) {
   $("discount").value = order?.discount ? won(order.discount) : "";
   $("orderDate").value = order?.orderDate || todayStr();
   $("dueDate").value = order?.dueDate || "";
+  // 기존 발주에 납기일이 없으면 '재고 있어 바로'로 표시
+  const dueIsStock = order ? !order.dueDate : false;
+  $("dueStock").checked = dueIsStock;
+  $("dueDate").disabled = dueIsStock;
   $("deliveryDate").value = order?.deliveryDate || "";
   $("invoiceDate").value = order?.invoiceDate || "";
   // 신규거나, 계산서일이 납품일과 같으면 자동 연동 유지. 다르면 연동 해제(각각 유지).
@@ -988,8 +992,9 @@ async function saveOrder() {
   const customer = $("customer").value.trim();
   if (!customer) return toast("업체명을 입력해주세요.", "error");
   const orderDate = $("orderDate").value;
-  const dueDate = $("dueDate").value;
-  if (!orderDate || !dueDate) return toast("발주일과 납기일을 입력해주세요.", "error");
+  if (!orderDate) return toast("발주일을 입력해주세요.", "error");
+  // 재고 있어 바로 = 납기 없음(null), 아니면 선택한 날짜
+  const dueDate = $("dueStock").checked ? null : ($("dueDate").value || null);
   if (!orderItemsDraft.length) return toast("아이템을 1개 이상 추가해주세요.", "error");
 
   const items = orderItemsDraft.map((g) => ({
@@ -1490,6 +1495,12 @@ function bindEvents() {
     if (invoiceLinked && $("deliveryDate").value) $("invoiceDate").value = $("deliveryDate").value;
   });
   $("invoiceDate").addEventListener("change", () => { invoiceLinked = false; });
+  // '재고 있어 바로' 체크 시 납기일 입력 비활성화(납기 없음)
+  $("dueStock").addEventListener("change", () => {
+    const on = $("dueStock").checked;
+    $("dueDate").disabled = on;
+    if (on) $("dueDate").value = "";
+  });
   $("saveOrderButton").addEventListener("click", saveOrder);
   $("deleteButton").addEventListener("click", deleteOrder);
 
