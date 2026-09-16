@@ -68,6 +68,9 @@ export async function buildSubmissionHtml(title) {
   const pipeline = [];
   for (const o of orders) {
     if (o.invoiceDate) continue;
+    // 대상 연도와 관련된 미발행만 (발주일/납기/납품일 중 하나가 해당 연도)
+    const rel = yOf(o.orderDate) === YEAR || yOf(o.dueDate) === YEAR || yOf(o.deliveryDate) === YEAR;
+    if (!rel) continue;
     pipeline.push({
       cust: (o.customer || "미지정").trim(),
       total: orderTotal(o),
@@ -139,6 +142,8 @@ select.fs{padding:3px 9px;border-radius:5px;border:1px solid #30363d;background:
 .card.fw{grid-column:1/-1;}
 .ctitle{font-size:11px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;color:#e6edf3;}
 .wtag{font-size:9px;background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.25);padding:1px 5px;border-radius:3px;}
+.tgl{margin-left:auto;padding:2px 10px;border-radius:20px;border:1px solid #d29922;background:transparent;color:#d29922;cursor:pointer;font-size:10px;font-family:inherit;font-weight:600;white-space:nowrap;}
+.tgl:hover{background:rgba(210,153,34,.15);}.tgl.on{background:#d29922;color:#0d1117;}
 .h155{position:relative;height:155px;}.h190{position:relative;height:190px;}
 .h200{position:relative;height:200px;}.h230{position:relative;height:230px;}
 .ins{padding:0 18px 18px;}
@@ -200,7 +205,7 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
   </div>
   <div class="afd" id="afd">필터: <span>전체</span></div>
   <div class="grid">
-    <div class="card"><div class="ctitle">&#128230; 브랜드별 실적 · 연간예산 · 3분기예산 <span class="wtag">부진=빨강</span></div><div class="h155"><canvas id="cBrand"></canvas></div></div>
+    <div class="card"><div class="ctitle">&#128230; 브랜드별 실적 · 연간예산 · 3분기예산 <span class="wtag">부진=빨강</span><button class="tgl" id="togPending" onclick="togglePending(this)">＋ 미발행 포함</button></div><div class="h155"><canvas id="cBrand"></canvas></div></div>
     <div class="card"><div class="ctitle">&#127919; 달성률 (연간 vs 3분기) <span class="wtag">60% 미만 부진</span></div><div class="h190"><canvas id="cAch"></canvas></div></div>
     <div class="card fw"><div class="ctitle">&#128202; 브랜드별 월별 매출 추이 (단위: 원)</div><div class="h200"><canvas id="cBrandMonth"></canvas></div></div>
     <div class="card fw"><div class="ctitle">&#128200; 월별 총 매출 &amp; 누계 (단위: 원)</div><div class="h155"><canvas id="cMonth"></canvas></div></div>
@@ -257,6 +262,12 @@ var brands=CODES.map(function(code){
   return {code:code,name:CNAME[code],cur:cur,curTotal:curTotal,prev:DATA.prevByItem[code]||0,annBud:b.annBud,qBud:b.qBud};
 }).filter(function(b){return b.curTotal>0||b.annBud>0||b.prev>0;});
 brands.forEach(function(b){b.annRate=b.annBud>0?b.curTotal/b.annBud:null;b.qRate=b.qBud>0?b.curTotal/b.qBud:null;});
+// 세금계산서 미발행(예정) 금액을 브랜드별로 집계
+var pendByCode={};CODES.forEach(function(c){pendByCode[c]=0;});
+(DATA.pipeline||[]).forEach(function(p){(p.items||[]).forEach(function(it){pendByCode[it.c]=(pendByCode[it.c]||0)+(it.amt||0);});});
+var pendTotal=Object.keys(pendByCode).reduce(function(a,k){return a+pendByCode[k];},0);
+var showPending=false;
+function togglePending(btn){showPending=!showPending;btn.classList.toggle('on',showPending);btn.textContent=showPending?'－ 미발행 숨기기':'＋ 미발행 포함';upBrand();}
 
 var F={product:'all',vendor:'all',month:'all'};
 function inScope(v){return F.product==='all'?v.items:(v.items.indexOf(F.product)>=0?[F.product]:[]);}
@@ -285,7 +296,12 @@ var vcols=['#58a6ff','#3fb950','#bc8cff','#ffa657','#ff6e96','#39d353','#d29922'
 function initCharts(){
   if(typeof Chart==='undefined')return;
   Chart.defaults.color='#adbac7';Chart.defaults.borderColor='#30363d';Chart.defaults.font.family="'Segoe UI','Malgun Gothic',sans-serif";Chart.defaults.font.size=11;Chart.defaults.devicePixelRatio=Math.max(2,window.devicePixelRatio||1);
-  ch1=new Chart(document.getElementById('cBrand'),{type:'bar',data:{labels:[],datasets:[{label:'실적',data:[],backgroundColor:[],borderRadius:2,barPercentage:.65},{label:'연간예산',data:[],backgroundColor:'rgba(88,166,255,.15)',borderColor:'rgba(88,166,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.65},{label:'3분기예산',data:[],backgroundColor:'rgba(188,140,255,.12)',borderColor:'rgba(188,140,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.65}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{grid:{color:'#21262d'}},y:{ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
+  ch1=new Chart(document.getElementById('cBrand'),{type:'bar',data:{labels:[],datasets:[
+    {label:'실적(발행)',data:[],backgroundColor:[],borderRadius:2,barPercentage:.7,stack:'sales'},
+    {label:'미발행(예정)',data:[],backgroundColor:'rgba(210,153,34,.9)',borderRadius:2,barPercentage:.7,stack:'sales',hidden:true},
+    {label:'연간예산',data:[],backgroundColor:'rgba(88,166,255,.15)',borderColor:'rgba(88,166,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.7,stack:'ab'},
+    {label:'3분기예산',data:[],backgroundColor:'rgba(188,140,255,.12)',borderColor:'rgba(188,140,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.7,stack:'qb'}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);},footer:function(items){if(!showPending)return'';var s=0;items.forEach(function(i){if(i.dataset.stack==='sales')s+=i.raw;});return '총 발주: '+fmtT(s);}}}},scales:{x:{stacked:true,grid:{color:'#21262d'}},y:{stacked:true,ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
   ch2=new Chart(document.getElementById('cAch'),{type:'bar',data:{labels:[],datasets:[{label:'연간 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42},{label:'3분기 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+(c.raw*100).toFixed(1)+'%';}}}},scales:{x:{min:0,max:1.3,ticks:{callback:function(v){return(v*100).toFixed(0)+'%';}},grid:{color:'#21262d'}}}}});
   ch3=new Chart(document.getElementById('cBrandMonth'),{type:'bar',data:{labels:mlabels,datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{stacked:true,grid:{color:'#21262d'}},y:{stacked:true,ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
   ch4=new Chart(document.getElementById('cMonth'),{type:'bar',data:{labels:mlabels,datasets:[{label:'월 실적',data:[],backgroundColor:'rgba(88,166,255,.6)',borderRadius:3,barPercentage:.5},{label:'누계',type:'line',data:[],borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.07)',fill:true,tension:.35,pointRadius:3,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{grid:{color:'#21262d'}},y:{ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
@@ -294,7 +310,7 @@ function initCharts(){
   upAll();
 }
 function upKPI(){var fvd=fv();var ytd=fvd.reduce(function(s,v){return s+vAmt(v);},0);var scope=F.product==='all'?brands:brands.filter(function(b){return b.code===F.product;});var annBud=0,qBud=0,r=0;scope.forEach(function(b){annBud+=b.annBud;qBud+=b.qBud;r+=b.curTotal;});var aA=annBud>0?r/annBud:0,qA=qBud>0?r/qBud:0;document.getElementById('k-ytd').textContent=fmtT(ytd);document.getElementById('k-ann-bud').textContent=fmtT(annBud);document.getElementById('k-q-bud').textContent=fmtT(qBud);var ka=document.getElementById('k-ann-ach');ka.textContent=(aA*100).toFixed(1)+'%';ka.className='kpi-val '+(aA>=.8?'cg':aA>=.6?'cw':'cr');var kq=document.getElementById('k-q-ach');kq.textContent=(qA*100).toFixed(1)+'%';kq.className='kpi-val '+(qA>=.8?'cg':qA>=.6?'cw':'cr');}
-function upBrand(){var bd=F.product==='all'?brands:brands.filter(function(b){return b.code===F.product;});ch1.data.labels=bd.map(function(b){return b.name;});ch1.data.datasets[0].data=bd.map(function(b){return b.curTotal;});ch1.data.datasets[0].backgroundColor=bd.map(function(b){return poor(b)?'rgba(248,81,73,.75)':'rgba(63,185,80,.75)';});ch1.data.datasets[1].data=bd.map(function(b){return b.annBud;});ch1.data.datasets[2].data=bd.map(function(b){return b.qBud;});ch1.update();}
+function upBrand(){var bd=F.product==='all'?brands:brands.filter(function(b){return b.code===F.product;});ch1.data.labels=bd.map(function(b){return b.name;});ch1.data.datasets[0].data=bd.map(function(b){return b.curTotal;});ch1.data.datasets[0].backgroundColor=bd.map(function(b){return poor(b)?'rgba(248,81,73,.8)':'rgba(63,185,80,.8)';});ch1.data.datasets[1].data=bd.map(function(b){return pendByCode[b.code]||0;});ch1.data.datasets[1].hidden=!showPending;ch1.data.datasets[2].data=bd.map(function(b){return b.annBud;});ch1.data.datasets[3].data=bd.map(function(b){return b.qBud;});ch1.update();}
 function upAch(){var bd=(F.product==='all'?brands:brands.filter(function(b){return b.code===F.product;})).filter(function(b){return b.annRate!==null;});ch2.data.labels=bd.map(function(b){return b.name;});ch2.data.datasets[0].data=bd.map(function(b){return b.annRate;});ch2.data.datasets[0].backgroundColor=bd.map(function(b){return achC(b.annRate);});ch2.data.datasets[1].data=bd.map(function(b){return b.qRate||0;});ch2.data.datasets[1].backgroundColor=bd.map(function(b){var c=achC(b.qRate);return c.charAt(0)==='#'?c+'99':c;});ch2.update();}
 function upBrandMonth(){var bd=F.product==='all'?brands:brands.filter(function(b){return b.code===F.product;});ch3.data.datasets=bd.map(function(b){var d=b.cur.slice();if(F.month!=='all'){d=d.map(function(v,i){return i===+F.month?v:0;});}return{label:b.name,data:d,backgroundColor:(PCOL[b.code]||'#8b949e'),borderRadius:2,barPercentage:.6,stack:'s'};});ch3.update();}
 function upMonth(){var fvd=fv();var plot=[],cum=[],c=0;for(var i=0;i<MAXM;i++){var val=0;fvd.forEach(function(v){var codes=inScope(v);codes.forEach(function(cd){val+=(v.im[cd]||[])[i]||0;});});if(F.month!=='all'&&+F.month!==i)val=0;plot.push(val);var real=0;fvd.forEach(function(v){var codes=inScope(v);codes.forEach(function(cd){real+=(v.im[cd]||[])[i]||0;});});c+=real;cum.push(c);}ch4.data.datasets[0].data=plot;ch4.data.datasets[1].data=cum;ch4.update();}
