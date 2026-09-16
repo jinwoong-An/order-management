@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.1.1" rel="stylesheet"/>
+<link href="/styles.css?v=64.1.2" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -176,7 +176,7 @@
 
 <article class="panel meeting-section forecast-panel">
 <div class="panel-head forecast-head">
-<div><h2 id="currentForecastTitle">월 예상</h2><p>월을 선택하면 예상이 자동 계산됩니다. 매월 반복 4건은 두 예상에 고정 표시되며, 계산서 예상에는 납품 완료·미계산서와 선택월까지 납기인 미계산서 발주가 자동 반영됩니다.</p></div>
+<div><h2 id="currentForecastTitle">월 예상</h2><p>월을 선택하면 예상이 자동 계산됩니다. 매월 반복 4건은 고정 표시되며, 계산서 예상에는 <strong>선택한 달에 납기 예정인 미계산서 발주</strong>만 표시됩니다. 각 항목의 "수정"으로 실제 발주 내용을 편집할 수 있습니다.</p></div>
 <div class="forecast-tools">
 <button class="button secondary" id="newForecastButton">+ 발주 예상 직접 추가</button>
 </div>
@@ -318,6 +318,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.1.1" type="module"></script>
+<script src="/app.js?v=64.1.2" type="module"></script>
 </body>
 </html>

@@ -855,16 +855,12 @@ function renderForecastPanel() {
       items: f.items || [], amount: parseNum(f.amount) || (f.items || []).reduce((s, it) => s + parseNum(it.amount), 0),
     }));
   } else {
-    // 계산서 예상: 납품완료·미계산서 + 선택월까지 납기인 미계산서 + 직접추가(invoice) + 반복
-    const target = `${ui.year}-${String(month).padStart(2, "0")}`;
-    const auto = store.orders.filter((o) => {
-      if (o.invoiceDate) return false;
-      if (o.deliveryDate) return true; // 납품완료·미계산서
-      if (o.dueDate && o.dueDate.slice(0, 7) <= target) return true; // 선택월까지 납기
-      return false;
-    });
+    // 계산서 예상: 선택한 달에 '납기'가 있는 미계산서 발주만 (그 달만)
+    const auto = store.orders.filter((o) =>
+      !o.invoiceDate && yearOf(o.dueDate) === ui.year && monthOf(o.dueDate) === month
+    );
     entries = auto.map((o) => ({
-      id: o.id, kind: "auto", name: o.customer, note: o.deliveryDate ? "납품완료·미계산서" : "납기도래 미계산서",
+      id: o.id, kind: "auto", name: o.customer, note: `${month}월 납기 예정`,
       items: o.items || [], amount: orderTotal(o),
     }));
     const manual = store.forecasts.filter((f) => f.type === "invoice" && monthOf(f.invoiceMonth || f.entryMonth) === month && yearOf(f.invoiceMonth || f.entryMonth) === ui.year);
@@ -892,7 +888,7 @@ function renderForecastPanel() {
     let action = "";
     if (e.kind === "recurring") action = `<button class="mini-btn" data-recurring-edit="${e.index}">수정</button>`;
     else if (e.kind === "manual") action = `<button class="mini-btn" data-forecast-edit="${e.id}">수정</button>`;
-    else action = `<span class="muted">자동</span>`;
+    else action = `<button class="mini-btn" data-order-forecast-edit="${e.id}">수정</button>`;
     return `<tr class="forecast-row kind-${e.kind}">
       <td>${escapeHtml(e.name || "-")}</td>
       <td>${itemPills}</td>
@@ -930,6 +926,9 @@ function renderMonthChips(id, selected, onChange) {
   box.onclick = (e) => {
     const btn = e.target.closest("[data-month-chip]");
     if (!btn) return;
+    // 눌린 달로 활성 표시 즉시 이동
+    box.querySelectorAll(".month-chip").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
     onChange(Number(btn.dataset.monthChip));
   };
 }
@@ -1576,8 +1575,10 @@ function bindEvents() {
   $("forecastBody").addEventListener("click", (e) => {
     const rec = e.target.closest("[data-recurring-edit]");
     const man = e.target.closest("[data-forecast-edit]");
+    const ord = e.target.closest("[data-order-forecast-edit]");
     if (rec) openRecurringDialog(Number(rec.dataset.recurringEdit));
     else if (man) { const f = store.forecasts.find((x) => x.id === man.dataset.forecastEdit); if (f) openForecastDialog(f); }
+    else if (ord) { const o = store.orders.find((x) => x.id === ord.dataset.orderForecastEdit); if (o) openOrderDialog(o); }
   });
   $("forecastForm").addEventListener("submit", saveForecast);
   $("deleteForecastButton").addEventListener("click", deleteForecast);
