@@ -56,12 +56,21 @@ export async function buildSubmissionHtml(title) {
     }
   }
 
+  const NAME_TO_CODE = Object.fromEntries(ITEMS.map((i) => [i.name, i.code]));
+  const planValues = c.planValues || [];
+  const q4Sum = (code) => planValues
+    .filter((p) => Number(p.year) === YEAR && ((NAME_TO_CODE[p.item_label] || p.item_label) === code || p.item_label === CODE_NAME[code]))
+    .reduce((s, p) => s + num(p.next_budget), 0);
   const budgets = {};
   ITEM_CODES.forEach((code) => {
     const m = metrics.find((x) => Number(x.year) === YEAR && x.item === code);
+    const q2 = m ? num(m.q2_new_budget) : 0;
+    const q3 = m ? num(m.q3_new_budget) : 0;
+    const q4 = q4Sum(code);
     budgets[code] = {
       annBud: m ? num(m.budget) : 0,
-      qBud: m ? (num(m.q3_new_budget) || num(m.q2_new_budget) || num(m.budget)) : 0,
+      q2, q3, q4,
+      qBud: q3 || q2 || (m ? num(m.budget) : 0),
     };
   });
 
@@ -213,6 +222,10 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
     <div class="card"><div class="ctitle">&#127942; 업체별 매출 순위 Top 10</div><div class="h230"><canvas id="cVend"></canvas></div></div>
   </div>
   <div class="ins"><div class="ins-card">
+    <div class="ctitle">&#128176; ITEM별 분기 예산 · 실적 · 달성율</div>
+    <table class="mt"><thead><tr><th style="text-align:left">ITEM</th><th>올해 BUDGET</th><th>2분기 NEW</th><th>3분기 NEW</th><th>4분기 NEW</th><th>실적(TOTAL)</th><th>달성율</th></tr></thead><tbody id="budgetTable"></tbody></table>
+  </div></div>
+  <div class="ins"><div class="ins-card">
     <div class="ctitle">&#128202; 월별 실적 요약 (계산서 발행 기준)</div>
     <table class="mt"><thead><tr><th>월</th><th>월 실적</th><th>누계</th></tr></thead><tbody id="itb"></tbody></table>
   </div></div>
@@ -325,7 +338,8 @@ function upVend(){var map={};fv().forEach(function(v){map[v.n]=(map[v.n]||0)+vAm
 function upNotice(){var bad=brands.filter(function(b){return poor(b);}).map(function(b){return b.name+' '+(b.annRate*100).toFixed(1)+'%';});var n=document.getElementById('notice');if(bad.length){n.style.display='';n.innerHTML='&#9888;&#65039; 부진 제품군 (달성률 60% 미만) — '+bad.join(' · ');}else{n.style.display='none';}}
 function upTable(){var tb=document.getElementById('itb');var html='',c=0;for(var i=0;i<MAXM;i++){var val=0;vendors.forEach(function(v){v.items.forEach(function(cd){val+=(v.im[cd]||[])[i]||0;});});c+=val;html+='<tr><td style="text-align:center">'+(i+1)+'월</td><td>'+fmtT(val)+'</td><td>'+fmtT(c)+'</td></tr>';}var grand=c;if(showPending){html+='<tr><td style="text-align:center;color:#d29922">미발행(예정)</td><td style="color:#d29922">'+fmtT(pendTotal)+'</td><td style="color:#8b949e">-</td></tr>';grand=c+pendTotal;}html+='<tr style="font-weight:700"><td style="text-align:center;color:#e6edf3">'+(showPending?'총 발주':'합계')+'</td><td>'+fmtT(grand)+'</td><td>'+fmtT(grand)+'</td></tr>';tb.innerHTML=html;}
 function upAFD(){var parts=[];if(F.product!=='all')parts.push('제품군: '+F.product+'·'+(CNAME[F.product]||''));if(F.vendor!=='all')parts.push('업체: '+F.vendor);if(F.month!=='all')parts.push((+F.month+1)+'월');if(showPending)parts.push(pendActive()?'미발행 포함(총 발주)':'미발행 포함(전체월에서만 합산)');document.getElementById('afd').innerHTML='필터: '+(parts.length?parts.map(function(p){return'<span>'+p+'</span>';}).join(' '):'<span>전체</span>');}
-function upAll(){upKPI();upBrand();upAch();upBrandMonth();upMonth();upProd();upVend();upAFD();}
+function upBudgetTable(){var tb=document.getElementById('budgetTable');if(!tb)return;var html='',tA=0,t2=0,t3=0,t4=0,tR=0;brands.forEach(function(b){var bg=DATA.budgets[b.code]||{};var eff=b.curTotal+(pendActive()?(pendByCode[b.code]||0):0);var last=bg.q4||bg.q3||bg.q2||bg.annBud||0;var rate=last>0?(eff/last*100).toFixed(1)+'%':'-';html+='<tr><td style="text-align:left;color:#58a6ff;font-weight:600">'+b.code+'·'+b.name+'</td><td>'+fmtT(bg.annBud||0)+'</td><td>'+fmtT(bg.q2||0)+'</td><td>'+fmtT(bg.q3||0)+'</td><td>'+(bg.q4?fmtT(bg.q4):'-')+'</td><td style="color:#3fb950">'+fmtT(eff)+'</td><td>'+rate+'</td></tr>';tA+=bg.annBud||0;t2+=bg.q2||0;t3+=bg.q3||0;t4+=bg.q4||0;tR+=eff;});var lastT=t4||t3||t2||tA;html+='<tr style="font-weight:700;background:#1c2333"><td style="text-align:left;color:#e6edf3">TOTAL</td><td>'+fmtT(tA)+'</td><td>'+fmtT(t2)+'</td><td>'+fmtT(t3)+'</td><td>'+(t4?fmtT(t4):'-')+'</td><td style="color:#3fb950">'+fmtT(tR)+'</td><td>'+(lastT>0?(tR/lastT*100).toFixed(1)+'%':'-')+'</td></tr>';tb.innerHTML=html;}
+function upAll(){upKPI();upBrand();upAch();upBrandMonth();upMonth();upProd();upVend();upBudgetTable();upAFD();}
 function sf(type,val){F[type]=val;var bs=document.querySelectorAll('[data-f="'+type+'"]');for(var i=0;i<bs.length;i++)bs[i].classList.toggle('on',bs[i].dataset.v===val);upAll();}
 
 // ----- 보고서 -----
