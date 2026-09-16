@@ -106,7 +106,8 @@ export async function buildSubmissionHtml(title) {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"><\/script>
 <style>
 :root{color-scheme:dark;}*{box-sizing:border-box;margin:0;padding:0;}
-body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:12px;min-height:100vh;}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:12px;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+canvas{max-width:100%!important;}
 .tab-nav{background:#161b22;border-bottom:2px solid #30363d;padding:0 18px;display:flex;align-items:center;flex-wrap:wrap;}
 .tab-nav .logo{font-size:13px;font-weight:700;color:#58a6ff;margin-right:24px;padding:12px 0;white-space:nowrap;}
 .tab-btn{padding:12px 20px;border:none;border-bottom:2px solid transparent;background:transparent;color:#8b949e;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;margin-bottom:-2px;transition:all .2s;white-space:nowrap;}
@@ -117,7 +118,7 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Malgun Gothic',san
 .dash-header h2{font-size:14px;font-weight:700;color:#58a6ff;}
 .dash-header .sub{font-size:10px;color:#8b949e;margin-top:2px;}
 .badge{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);color:#58a6ff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;}
-.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:10px 18px;}
+.kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:10px 18px;}
 .kpi{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 13px;}
 .kpi-lbl{font-size:9px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
 .kpi-val{font-size:14px;font-weight:700;line-height:1.2;}
@@ -132,8 +133,9 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI','Malgun Gothic',san
 select.fs{padding:3px 9px;border-radius:5px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:11px;font-family:inherit;min-width:140px;}
 .afd{padding:4px 18px;font-size:10px;color:#8b949e;}
 .afd span{background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.2);color:#58a6ff;padding:1px 7px;border-radius:10px;margin-left:3px;font-weight:600;}
-.grid{padding:10px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 14px;}
+.grid{padding:10px 18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 14px;min-width:0;}
+.kpi{min-width:0;}
 .card.fw{grid-column:1/-1;}
 .ctitle{font-size:11px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;color:#e6edf3;}
 .wtag{font-size:9px;background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.25);padding:1px 5px;border-radius:3px;}
@@ -170,6 +172,7 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
 .brand-total{background:#1c2333;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid #30363d;}
 .plan-text{white-space:pre-wrap;font-size:11px;line-height:1.7;color:#c9d1d9;}
 .empty{color:#8b949e;text-align:center;padding:14px;font-size:11px;}
+@media(max-width:820px){.kpi-row{grid-template-columns:repeat(2,minmax(0,1fr));}.grid{grid-template-columns:minmax(0,1fr);}.brand-result{grid-template-columns:1fr;}.tab-nav{overflow-x:auto;}}
 </style></head><body>
 <nav class="tab-nav">
   <div class="logo">&#128202; JWA ${YEAR}</div>
@@ -281,7 +284,7 @@ var ch1,ch2,ch3,ch4,ch5,ch6;
 var vcols=['#58a6ff','#3fb950','#bc8cff','#ffa657','#ff6e96','#39d353','#d29922','#79c0ff','#56d364','#d2a8ff'];
 function initCharts(){
   if(typeof Chart==='undefined')return;
-  Chart.defaults.color='#8b949e';Chart.defaults.borderColor='#30363d';Chart.defaults.font.family="'Segoe UI',sans-serif";Chart.defaults.font.size=10;
+  Chart.defaults.color='#adbac7';Chart.defaults.borderColor='#30363d';Chart.defaults.font.family="'Segoe UI','Malgun Gothic',sans-serif";Chart.defaults.font.size=11;Chart.defaults.devicePixelRatio=Math.max(2,window.devicePixelRatio||1);
   ch1=new Chart(document.getElementById('cBrand'),{type:'bar',data:{labels:[],datasets:[{label:'실적',data:[],backgroundColor:[],borderRadius:2,barPercentage:.65},{label:'연간예산',data:[],backgroundColor:'rgba(88,166,255,.15)',borderColor:'rgba(88,166,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.65},{label:'3분기예산',data:[],backgroundColor:'rgba(188,140,255,.12)',borderColor:'rgba(188,140,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.65}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{grid:{color:'#21262d'}},y:{ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
   ch2=new Chart(document.getElementById('cAch'),{type:'bar',data:{labels:[],datasets:[{label:'연간 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42},{label:'3분기 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+(c.raw*100).toFixed(1)+'%';}}}},scales:{x:{min:0,max:1.3,ticks:{callback:function(v){return(v*100).toFixed(0)+'%';}},grid:{color:'#21262d'}}}}});
   ch3=new Chart(document.getElementById('cBrandMonth'),{type:'bar',data:{labels:mlabels,datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{stacked:true,grid:{color:'#21262d'}},y:{stacked:true,ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
