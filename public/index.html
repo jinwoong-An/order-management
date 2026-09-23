@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.4.0" rel="stylesheet"/>
+<link href="/styles.css?v=64.5.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -226,9 +226,13 @@
 </article>
 <article class="panel todo-panel">
 <div class="panel-head"><div><h2>할일 메모</h2><p>날짜와 상관없이 해야 할 일을 자유롭게 적어두세요.</p></div><label class="urgent-filter"><input type="checkbox" id="todoShowDone"/> 완료 포함</label></div>
-<form class="todo-add" id="todoForm"><input id="todoInput" autocomplete="off" placeholder="예: 세금계산서 정리, 거래처 연락, 재고 확인…" maxlength="200"/><button class="button primary" type="submit">추가</button></form>
+<form class="todo-add" id="todoForm">
+<input id="todoTitle" autocomplete="off" placeholder="제목 (예: 성전세미텍 건, 이번 주 처리)" maxlength="100"/>
+<textarea id="todoInput" placeholder="할일 내용 (예: 세금계산서 정리, 거래처 연락, 재고 확인…)" rows="2" maxlength="1000"></textarea>
+<button class="button primary" type="submit">추가</button>
+</form>
 <div class="todo-list" id="todoList"></div>
-<div class="empty-state" hidden="" id="todoEmpty"><strong>할일이 없습니다.</strong><span>위 입력창에 할일을 적고 추가하세요.</span></div>
+<div class="empty-state" hidden="" id="todoEmpty"><strong>할일이 없습니다.</strong><span>위에 제목과 내용을 적고 추가하세요.</span></div>
 </article>
 </div>
 </section>
@@ -354,6 +358,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.4.0" type="module"></script>
+<script src="/app.js?v=64.5.0" type="module"></script>
 </body>
 </html>

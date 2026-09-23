@@ -1081,18 +1081,26 @@ function renderTodoList() {
     return (a.createdAt || "") < (b.createdAt || "") ? -1 : 1;
   });
   $("todoEmpty").hidden = items.length > 0;
-  $("todoList").innerHTML = items.map((t) =>
-    `<div class="todo-item ${t.done ? "done" : ""}">
+  $("todoList").innerHTML = items.map((t) => {
+    const title = (t.title || "").trim();
+    const body = (t.text || "").trim();
+    return `<div class="todo-item ${t.done ? "done" : ""}">
       <label class="todo-check"><input type="checkbox" data-todo-done="${t.id}" ${t.done ? "checked" : ""}/><span></span></label>
-      <span class="todo-text">${escapeHtml(t.text)}</span>
+      <div class="todo-body">
+        ${title ? `<strong class="todo-title">${escapeHtml(title)}</strong>` : ""}
+        ${body ? `<span class="todo-text">${escapeHtml(body).replace(/\n/g, "<br>")}</span>` : ""}
+      </div>
       <button class="mini-btn danger" data-todo-del="${t.id}" title="삭제">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 async function addTodo(e) {
   e.preventDefault();
+  const title = $("todoTitle").value.trim();
   const text = $("todoInput").value.trim();
-  if (!text) return;
-  await api("/api/todos", { method: "POST", body: { text, done: false } });
+  if (!title && !text) return;
+  await api("/api/todos", { method: "POST", body: { title, text, done: false } });
+  $("todoTitle").value = "";
   $("todoInput").value = "";
   await refreshAll();
   renderTodoList();
