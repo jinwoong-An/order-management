@@ -1826,6 +1826,14 @@ function bindEvents() {
 
   // 할일 메모
   $("todoForm").addEventListener("submit", addTodo);
+  // 제목에서 Enter → 폼 제출 대신 내용 칸으로 이동 (제목만 추가되는 것 방지)
+  $("todoTitle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("todoInput").focus(); }
+  });
+  // 내용 칸에서 Ctrl/Cmd+Enter → 바로 추가
+  $("todoInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addTodo(e); }
+  });
   $("todoShowDone").addEventListener("change", renderTodoList);
   $("todoList").addEventListener("click", (e) => {
     const del = e.target.closest("[data-todo-del]");
