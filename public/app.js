@@ -135,6 +135,7 @@ const ui = {
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth() + 1,
   editingEventId: null,
+  openTodoId: null,
 };
 
 /* =========================================================
@@ -1072,6 +1073,13 @@ async function toggleEventDone(id) {
 }
 
 /* ---- 할일 메모 (todos) ---- */
+function fmtDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 function renderTodoList() {
   const showDone = $("todoShowDone").checked;
   let items = store.todos.slice();
@@ -1084,11 +1092,13 @@ function renderTodoList() {
   $("todoList").innerHTML = items.map((t) => {
     const title = (t.title || "").trim();
     const body = (t.text || "").trim();
-    return `<div class="todo-item ${t.done ? "done" : ""}">
+    const fuCount = Array.isArray(t.followups) ? t.followups.length : 0;
+    return `<div class="todo-item ${t.done ? "done" : ""}" data-todo-open="${t.id}">
       <label class="todo-check"><input type="checkbox" data-todo-done="${t.id}" ${t.done ? "checked" : ""}/><span></span></label>
       <div class="todo-body">
         ${title ? `<strong class="todo-title">${escapeHtml(title)}</strong>` : ""}
         ${body ? `<span class="todo-text">${escapeHtml(body).replace(/\n/g, "<br>")}</span>` : ""}
+        <span class="todo-meta">${fmtDateTime(t.createdAt)}${fuCount ? ` · 팔로우업 ${fuCount}` : ""}</span>
       </div>
       <button class="mini-btn danger" data-todo-del="${t.id}" title="삭제">✕</button>
     </div>`;
@@ -1111,10 +1121,57 @@ async function toggleTodoDone(id) {
   await api(`/api/todos/${id}`, { method: "PUT", body: { done: !t.done } });
   await refreshAll();
   renderTodoList();
+  if (ui.openTodoId === id) renderTodoDialog();
 }
 async function deleteTodo(id) {
+  if (!confirm("이 할일을 삭제할까요? (팔로우업도 함께 삭제됩니다)")) return;
   await api(`/api/todos/${id}`, { method: "DELETE" });
+  if (ui.openTodoId === id) { ui.openTodoId = null; $("todoDialog").close(); }
   await refreshAll();
+  renderTodoList();
+}
+
+/* ---- 할일 상세 창 (팔로우업) ---- */
+function openTodoDialog(id) {
+  ui.openTodoId = id;
+  renderTodoDialog();
+  $("todoFollowupInput").value = "";
+  $("todoDialog").showModal();
+}
+function renderTodoDialog() {
+  const t = store.todos.find((x) => x.id === ui.openTodoId);
+  if (!t) { $("todoDialog").close(); return; }
+  const title = (t.title || "").trim();
+  const body = (t.text || "").trim();
+  $("todoDialogTitle").textContent = title || "할일";
+  $("todoDialogOrigin").innerHTML = `
+    ${body ? `<div class="todo-origin-text">${escapeHtml(body).replace(/\n/g, "<br>")}</div>` : `<div class="todo-origin-text muted">내용 없음</div>`}
+    <div class="todo-origin-meta">작성 ${fmtDateTime(t.createdAt)}${t.done ? " · ✅ 완료" : ""}</div>`;
+  const fus = Array.isArray(t.followups) ? t.followups : [];
+  $("todoThreadEmpty").hidden = fus.length > 0;
+  $("todoThread").innerHTML = fus.map((f) => `
+    <div class="todo-fu">
+      <div class="todo-fu-text">${escapeHtml(f.text).replace(/\n/g, "<br>")}</div>
+      <div class="todo-fu-foot"><span class="todo-fu-meta">${fmtDateTime(f.at)}</span><button class="mini-btn danger" data-fu-del="${f.id}" title="삭제">✕</button></div>
+    </div>`).join("");
+  $("todoDialogDone").textContent = t.done ? "완료 취소" : "완료 처리";
+}
+async function addFollowup(e) {
+  e.preventDefault();
+  if (!ui.openTodoId) return;
+  const text = $("todoFollowupInput").value.trim();
+  if (!text) return;
+  await api(`/api/todos/${ui.openTodoId}/followups`, { method: "POST", body: { text } });
+  $("todoFollowupInput").value = "";
+  await refreshAll();
+  renderTodoDialog();
+  renderTodoList();
+}
+async function deleteFollowup(fid) {
+  if (!ui.openTodoId) return;
+  await api(`/api/todos/${ui.openTodoId}/followups/${fid}`, { method: "DELETE" });
+  await refreshAll();
+  renderTodoDialog();
   renderTodoList();
 }
 
@@ -1838,11 +1895,25 @@ function bindEvents() {
   $("todoList").addEventListener("click", (e) => {
     const del = e.target.closest("[data-todo-del]");
     if (del) { deleteTodo(del.dataset.todoDel); return; }
+    if (e.target.closest(".todo-check")) return; // 체크박스 클릭은 무시
+    const open = e.target.closest("[data-todo-open]");
+    if (open) openTodoDialog(open.dataset.todoOpen);
   });
   $("todoList").addEventListener("change", (e) => {
     const done = e.target.closest("[data-todo-done]");
     if (done) toggleTodoDone(done.dataset.todoDone);
   });
+  // 할일 상세 창(팔로우업)
+  $("todoFollowupForm").addEventListener("submit", addFollowup);
+  $("todoFollowupInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addFollowup(e); }
+  });
+  $("todoThread").addEventListener("click", (e) => {
+    const del = e.target.closest("[data-fu-del]");
+    if (del) deleteFollowup(del.dataset.fuDel);
+  });
+  $("todoDialogDone").addEventListener("click", () => { if (ui.openTodoId) toggleTodoDone(ui.openTodoId); });
+  $("todoDialogDelete").addEventListener("click", () => { if (ui.openTodoId) deleteTodo(ui.openTodoId); });
 
   // 백업 관리 다이얼로그
   $("dialogNowBackupButton").addEventListener("click", async () => { await backupNow(); await renderBackupList(); });

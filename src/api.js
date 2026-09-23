@@ -134,6 +134,29 @@ const API = {
     await writeCollection("todos", rows.filter((r) => r.id !== id));
     sendJson(res, 200, { ok: true });
   },
+  "POST /api/todos/:id/followups": async (req, res, { id }) => {
+    const body = await readBody(req);
+    const text = (body && body.text ? String(body.text) : "").trim();
+    if (!text) return sendJson(res, 400, { error: "내용을 입력하세요." });
+    const rows = await readCollection("todos");
+    const idx = rows.findIndex((r) => r.id === id);
+    if (idx < 0) return sendJson(res, 404, { error: "할일을 찾을 수 없습니다." });
+    const entry = { id: newId("fu"), text, at: new Date().toISOString() };
+    const followups = Array.isArray(rows[idx].followups) ? rows[idx].followups : [];
+    followups.push(entry);
+    rows[idx] = { ...rows[idx], followups };
+    await writeCollection("todos", rows);
+    sendJson(res, 201, rows[idx]);
+  },
+  "DELETE /api/todos/:id/followups/:fid": async (_req, res, { id, fid }) => {
+    const rows = await readCollection("todos");
+    const idx = rows.findIndex((r) => r.id === id);
+    if (idx < 0) return sendJson(res, 404, { error: "할일을 찾을 수 없습니다." });
+    const followups = (Array.isArray(rows[idx].followups) ? rows[idx].followups : []).filter((f) => f.id !== fid);
+    rows[idx] = { ...rows[idx], followups };
+    await writeCollection("todos", rows);
+    sendJson(res, 200, rows[idx]);
+  },
 
   "GET /api/orders": async (_req, res) => sendJson(res, 200, await readCollection("orders")),
   "POST /api/orders": async (req, res) => {
