@@ -76,13 +76,38 @@ const API = {
 
   // 앱 시작 시 모든 컬렉션을 한 번에 반환 (호출 수/콜드스타트 최소화)
   "GET /api/bootstrap": async (_req, res) => {
-    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans] =
+    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events] =
       await Promise.all([
         readCollection("orders"), readCollection("annualMetrics"), readCollection("planValues"),
         readCollection("recurringForecasts"), readCollection("forecasts"), readCollection("monthlyPlans"),
-        readCollection("yearlyAnalysis"), readCollection("customerPlans"),
+        readCollection("yearlyAnalysis"), readCollection("customerPlans"), readCollection("events"),
       ]);
-    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans });
+    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events });
+  },
+
+  // ---- 일정(캘린더) ----
+  "GET /api/events": async (_req, res) => sendJson(res, 200, await readCollection("events")),
+  "POST /api/events": async (req, res) => {
+    const body = await readBody(req);
+    const rows = await readCollection("events");
+    const entry = { ...body, id: newId("ev"), createdAt: new Date().toISOString() };
+    rows.push(entry);
+    await writeCollection("events", rows);
+    sendJson(res, 201, entry);
+  },
+  "PUT /api/events/:id": async (req, res, { id }) => {
+    const body = await readBody(req);
+    const rows = await readCollection("events");
+    const idx = rows.findIndex((r) => r.id === id);
+    if (idx < 0) return sendJson(res, 404, { error: "일정을 찾을 수 없습니다." });
+    rows[idx] = { ...rows[idx], ...body, id };
+    await writeCollection("events", rows);
+    sendJson(res, 200, rows[idx]);
+  },
+  "DELETE /api/events/:id": async (_req, res, { id }) => {
+    const rows = await readCollection("events");
+    await writeCollection("events", rows.filter((r) => r.id !== id));
+    sendJson(res, 200, { ok: true });
   },
 
   "GET /api/orders": async (_req, res) => sendJson(res, 200, await readCollection("orders")),

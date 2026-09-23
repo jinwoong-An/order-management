@@ -24,6 +24,7 @@ export const SEED = {
   forecasts: [],
   monthlyPlans: [],
   yearlyAnalysis: [],
+  events: [],
 };
 
 export const COLLECTION_NAMES = Object.keys(SEED);

@@ -100,6 +100,7 @@ const store = {
   forecasts: [],
   monthlyPlans: [],
   yearlyAnalysis: [],
+  events: [],
 };
 
 const ui = {
@@ -129,6 +130,10 @@ const ui = {
   editingForecastId: null,
   completeContext: null,
   recurringEdit: null,
+  // 캘린더
+  calYear: new Date().getFullYear(),
+  calMonth: new Date().getMonth() + 1,
+  editingEventId: null,
 };
 
 /* =========================================================
@@ -158,6 +163,7 @@ async function refreshAll() {
     forecasts: d.forecasts || [],
     monthlyPlans: d.monthlyPlans || [],
     yearlyAnalysis: d.yearlyAnalysis || [],
+    events: d.events || [],
   });
   ensureRecurringDefaults();
 }
@@ -186,12 +192,13 @@ const VIEW_META = {
   analytics: { title: "통합분석", sub: "발주·세금계산서 데이터를 월별·거래처별로 분석합니다.", year: true },
   performance: { title: "연간영업실적 및 계획", sub: "BUDGET 대비 실적과 ITEM별 계획을 관리합니다.", year: true },
   forecast: { title: "월간회의", sub: "월 결과와 예상, 주요 계획을 한 곳에서 준비합니다.", year: false },
+  calendar: { title: "캘린더", sub: "일정을 날짜별로 관리하고 급한 순서로 확인합니다.", year: false },
 };
 
 function setView(view) {
   ui.view = view;
   $$(".view-section").forEach((s) => (s.hidden = true));
-  const map = { orders: "ordersView", analytics: "analyticsView", performance: "performanceView", forecast: "forecastView" };
+  const map = { orders: "ordersView", analytics: "analyticsView", performance: "performanceView", forecast: "forecastView", calendar: "calendarView" };
   const sec = $(map[view]);
   if (sec) sec.hidden = false;
   $$(".nav-item[data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
@@ -210,6 +217,7 @@ function renderView() {
     case "analytics": renderAnalytics(); break;
     case "performance": renderPerformance(); break;
     case "forecast": renderForecast(); break;
+    case "calendar": renderCalendar(); renderUrgentList(); break;
   }
 }
 
@@ -909,6 +917,113 @@ function renderMonthlyPlan() {
 }
 
 /* =========================================================
+ * 캘린더 (calendar view)
+ * =======================================================*/
+const PRIO_RANK = { high: 0, normal: 1, low: 2 };
+const PRIO_LABEL = { high: "높음", normal: "보통", low: "낮음" };
+function prioRank(e) { return PRIO_RANK[e.priority] ?? 1; }
+function dday(dateStr) {
+  const a = new Date(dateStr + "T00:00:00");
+  const b = new Date(todayStr() + "T00:00:00");
+  const diff = Math.round((a - b) / 86400000);
+  if (diff < 0) return { label: `지남 ${-diff}일`, cls: "overdue", diff };
+  if (diff === 0) return { label: "오늘", cls: "today", diff };
+  if (diff <= 3) return { label: `D-${diff}`, cls: "soon", diff };
+  return { label: `D-${diff}`, cls: "later", diff };
+}
+
+function renderCalendar() {
+  $("calTitle").textContent = `${ui.calYear}년 ${ui.calMonth}월`;
+  const wd = ["일", "월", "화", "수", "목", "금", "토"];
+  $("calWeekdays").innerHTML = wd.map((d, i) => `<div class="cal-wd ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${d}</div>`).join("");
+  const startDow = new Date(ui.calYear, ui.calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(ui.calYear, ui.calMonth, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const today = todayStr();
+  const byDate = {};
+  for (const e of store.events) (byDate[e.date] || (byDate[e.date] = [])).push(e);
+  $("calendarGrid").innerHTML = cells.map((d, idx) => {
+    if (d === null) return `<div class="cal-cell empty"></div>`;
+    const dateStr = `${ui.calYear}-${String(ui.calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dow = idx % 7;
+    const evs = (byDate[dateStr] || []).slice().sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0) || prioRank(a) - prioRank(b));
+    const chips = evs.slice(0, 4).map((e) =>
+      `<div class="cal-ev prio-${e.priority || "normal"} ${e.done ? "done" : ""}" data-event-chip="${e.id}" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</div>`).join("");
+    const more = evs.length > 4 ? `<div class="cal-more">+${evs.length - 4}건</div>` : "";
+    return `<div class="cal-cell ${dateStr === today ? "today" : ""}" data-cal-date="${dateStr}">
+      <div class="cal-daynum ${dow === 0 ? "sun" : dow === 6 ? "sat" : ""}">${d}</div>${chips}${more}</div>`;
+  }).join("");
+}
+
+function renderUrgentList() {
+  const showDone = $("urgentShowDone").checked;
+  let evs = store.events.slice();
+  if (!showDone) evs = evs.filter((e) => !e.done);
+  evs.sort((a, b) => {
+    if ((a.done ? 1 : 0) !== (b.done ? 1 : 0)) return (a.done ? 1 : 0) - (b.done ? 1 : 0);
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return prioRank(a) - prioRank(b);
+  });
+  $("urgentEmpty").hidden = evs.length > 0;
+  $("urgentList").innerHTML = evs.map((e) => {
+    const dd = dday(e.date);
+    return `<div class="urgent-item ${e.done ? "done" : dd.cls}">
+      <span class="dday-badge ${e.done ? "donebadge" : dd.cls}">${e.done ? "완료" : dd.label}</span>
+      <div class="urgent-main"><strong>${escapeHtml(e.title)}</strong>
+        <span>${e.date} · <em class="prio-dot prio-${e.priority || "normal"}"></em>${PRIO_LABEL[e.priority] || "보통"}${e.memo ? " · " + escapeHtml(e.memo.slice(0, 50)) : ""}</span></div>
+      <div class="urgent-actions"><button class="mini-btn" data-event-done="${e.id}">${e.done ? "되돌리기" : "완료"}</button><button class="mini-btn" data-event-edit="${e.id}">수정</button></div>
+    </div>`;
+  }).join("");
+}
+
+function openEventDialog(ev) {
+  ui.editingEventId = ev && ev.id ? ev.id : null;
+  $("eventDialogTitle").textContent = ui.editingEventId ? "일정 수정" : "일정 추가";
+  $("eventDate").value = (ev && ev.date) || todayStr();
+  $("eventTitle").value = (ev && ev.title) || "";
+  $("eventMemo").value = (ev && ev.memo) || "";
+  $("eventPriority").value = (ev && ev.priority) || "normal";
+  $("eventDone").checked = !!(ev && ev.done);
+  $("deleteEventButton").hidden = !ui.editingEventId;
+  $("eventDialog").showModal();
+}
+async function saveEvent(e) {
+  e.preventDefault();
+  const date = $("eventDate").value;
+  const title = $("eventTitle").value.trim();
+  if (!date || !title) return toast("날짜와 일정 내용을 입력하세요.", "error");
+  const payload = { date, title, memo: $("eventMemo").value.trim(), priority: $("eventPriority").value, done: $("eventDone").checked };
+  if (ui.editingEventId) await api(`/api/events/${ui.editingEventId}`, { method: "PUT", body: payload });
+  else await api("/api/events", { method: "POST", body: payload });
+  $("eventDialog").close();
+  await refreshAll();
+  renderCalendar();
+  renderUrgentList();
+  toast("일정을 저장했습니다.", "success");
+}
+async function deleteEvent() {
+  if (!ui.editingEventId) return;
+  if (!confirm("이 일정을 삭제할까요?")) return;
+  await api(`/api/events/${ui.editingEventId}`, { method: "DELETE" });
+  $("eventDialog").close();
+  await refreshAll();
+  renderCalendar();
+  renderUrgentList();
+  toast("일정을 삭제했습니다.", "success");
+}
+async function toggleEventDone(id) {
+  const ev = store.events.find((x) => x.id === id);
+  if (!ev) return;
+  await api(`/api/events/${id}`, { method: "PUT", body: { done: !ev.done } });
+  await refreshAll();
+  renderCalendar();
+  renderUrgentList();
+}
+
+/* =========================================================
  * 셀렉트/칩 헬퍼
  * =======================================================*/
 function fillYearSelect(id, selected, onChange) {
@@ -1591,6 +1706,27 @@ function bindEvents() {
     await refreshAll();
     renderMonthlyPlan();
     toast("월 계획을 저장했습니다.", "success");
+  });
+
+  // 캘린더
+  $("addEventButton").addEventListener("click", () => openEventDialog(null));
+  $("calPrev").addEventListener("click", () => { ui.calMonth -= 1; if (ui.calMonth < 1) { ui.calMonth = 12; ui.calYear -= 1; } renderCalendar(); });
+  $("calNext").addEventListener("click", () => { ui.calMonth += 1; if (ui.calMonth > 12) { ui.calMonth = 1; ui.calYear += 1; } renderCalendar(); });
+  $("calToday").addEventListener("click", () => { const d = new Date(); ui.calYear = d.getFullYear(); ui.calMonth = d.getMonth() + 1; renderCalendar(); });
+  $("calendarGrid").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-event-chip]");
+    if (chip) { const ev = store.events.find((x) => x.id === chip.dataset.eventChip); if (ev) openEventDialog(ev); return; }
+    const cell = e.target.closest("[data-cal-date]");
+    if (cell) openEventDialog({ date: cell.dataset.calDate });
+  });
+  $("eventForm").addEventListener("submit", saveEvent);
+  $("deleteEventButton").addEventListener("click", deleteEvent);
+  $("urgentShowDone").addEventListener("change", renderUrgentList);
+  $("urgentList").addEventListener("click", (e) => {
+    const done = e.target.closest("[data-event-done]");
+    const edit = e.target.closest("[data-event-edit]");
+    if (done) toggleEventDone(done.dataset.eventDone);
+    else if (edit) { const ev = store.events.find((x) => x.id === edit.dataset.eventEdit); if (ev) openEventDialog(ev); }
   });
 
   // 백업 관리 다이얼로그
