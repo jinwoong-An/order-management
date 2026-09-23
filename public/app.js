@@ -101,6 +101,7 @@ const store = {
   monthlyPlans: [],
   yearlyAnalysis: [],
   events: [],
+  todos: [],
 };
 
 const ui = {
@@ -164,6 +165,7 @@ async function refreshAll() {
     monthlyPlans: d.monthlyPlans || [],
     yearlyAnalysis: d.yearlyAnalysis || [],
     events: d.events || [],
+    todos: d.todos || [],
   });
   ensureRecurringDefaults();
 }
@@ -217,7 +219,7 @@ function renderView() {
     case "analytics": renderAnalytics(); break;
     case "performance": renderPerformance(); break;
     case "forecast": renderForecast(); break;
-    case "calendar": renderCalendar(); renderUrgentList(); break;
+    case "calendar": renderCalendar(); renderUrgentList(); renderTodoList(); break;
   }
 }
 
@@ -1069,6 +1071,45 @@ async function toggleEventDone(id) {
   renderUrgentList();
 }
 
+/* ---- 할일 메모 (todos) ---- */
+function renderTodoList() {
+  const showDone = $("todoShowDone").checked;
+  let items = store.todos.slice();
+  if (!showDone) items = items.filter((t) => !t.done);
+  items.sort((a, b) => {
+    if ((a.done ? 1 : 0) !== (b.done ? 1 : 0)) return (a.done ? 1 : 0) - (b.done ? 1 : 0);
+    return (a.createdAt || "") < (b.createdAt || "") ? -1 : 1;
+  });
+  $("todoEmpty").hidden = items.length > 0;
+  $("todoList").innerHTML = items.map((t) =>
+    `<div class="todo-item ${t.done ? "done" : ""}">
+      <label class="todo-check"><input type="checkbox" data-todo-done="${t.id}" ${t.done ? "checked" : ""}/><span></span></label>
+      <span class="todo-text">${escapeHtml(t.text)}</span>
+      <button class="mini-btn danger" data-todo-del="${t.id}" title="삭제">✕</button>
+    </div>`).join("");
+}
+async function addTodo(e) {
+  e.preventDefault();
+  const text = $("todoInput").value.trim();
+  if (!text) return;
+  await api("/api/todos", { method: "POST", body: { text, done: false } });
+  $("todoInput").value = "";
+  await refreshAll();
+  renderTodoList();
+}
+async function toggleTodoDone(id) {
+  const t = store.todos.find((x) => x.id === id);
+  if (!t) return;
+  await api(`/api/todos/${id}`, { method: "PUT", body: { done: !t.done } });
+  await refreshAll();
+  renderTodoList();
+}
+async function deleteTodo(id) {
+  await api(`/api/todos/${id}`, { method: "DELETE" });
+  await refreshAll();
+  renderTodoList();
+}
+
 /* =========================================================
  * 셀렉트/칩 헬퍼
  * =======================================================*/
@@ -1773,6 +1814,18 @@ function bindEvents() {
     const edit = e.target.closest("[data-event-edit]");
     if (done) toggleEventDone(done.dataset.eventDone);
     else if (edit) { const ev = store.events.find((x) => x.id === edit.dataset.eventEdit); if (ev) openEventDialog(ev); }
+  });
+
+  // 할일 메모
+  $("todoForm").addEventListener("submit", addTodo);
+  $("todoShowDone").addEventListener("change", renderTodoList);
+  $("todoList").addEventListener("click", (e) => {
+    const del = e.target.closest("[data-todo-del]");
+    if (del) { deleteTodo(del.dataset.todoDel); return; }
+  });
+  $("todoList").addEventListener("change", (e) => {
+    const done = e.target.closest("[data-todo-done]");
+    if (done) toggleTodoDone(done.dataset.todoDone);
   });
 
   // 백업 관리 다이얼로그

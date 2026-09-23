@@ -76,13 +76,13 @@ const API = {
 
   // 앱 시작 시 모든 컬렉션을 한 번에 반환 (호출 수/콜드스타트 최소화)
   "GET /api/bootstrap": async (_req, res) => {
-    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events] =
+    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos] =
       await Promise.all([
         readCollection("orders"), readCollection("annualMetrics"), readCollection("planValues"),
         readCollection("recurringForecasts"), readCollection("forecasts"), readCollection("monthlyPlans"),
-        readCollection("yearlyAnalysis"), readCollection("customerPlans"), readCollection("events"),
+        readCollection("yearlyAnalysis"), readCollection("customerPlans"), readCollection("events"), readCollection("todos"),
       ]);
-    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events });
+    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos });
   },
 
   // ---- 일정(캘린더) ----
@@ -107,6 +107,31 @@ const API = {
   "DELETE /api/events/:id": async (_req, res, { id }) => {
     const rows = await readCollection("events");
     await writeCollection("events", rows.filter((r) => r.id !== id));
+    sendJson(res, 200, { ok: true });
+  },
+
+  // ---- 할일 메모 ----
+  "GET /api/todos": async (_req, res) => sendJson(res, 200, await readCollection("todos")),
+  "POST /api/todos": async (req, res) => {
+    const body = await readBody(req);
+    const rows = await readCollection("todos");
+    const entry = { text: "", done: false, ...body, id: newId("td"), createdAt: new Date().toISOString() };
+    rows.push(entry);
+    await writeCollection("todos", rows);
+    sendJson(res, 201, entry);
+  },
+  "PUT /api/todos/:id": async (req, res, { id }) => {
+    const body = await readBody(req);
+    const rows = await readCollection("todos");
+    const idx = rows.findIndex((r) => r.id === id);
+    if (idx < 0) return sendJson(res, 404, { error: "할일을 찾을 수 없습니다." });
+    rows[idx] = { ...rows[idx], ...body, id };
+    await writeCollection("todos", rows);
+    sendJson(res, 200, rows[idx]);
+  },
+  "DELETE /api/todos/:id": async (_req, res, { id }) => {
+    const rows = await readCollection("todos");
+    await writeCollection("todos", rows.filter((r) => r.id !== id));
     sendJson(res, 200, { ok: true });
   },
 

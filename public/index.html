@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.3.0" rel="stylesheet"/>
+<link href="/styles.css?v=64.4.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -218,11 +218,19 @@
 <div class="calendar-grid" id="calendarGrid"></div>
 <p class="cal-hint">날짜 칸을 누르면 그 날짜에 일정을 추가할 수 있고, 일정을 누르면 수정됩니다.</p>
 </article>
+<div class="calendar-side">
 <article class="panel urgent-panel">
 <div class="panel-head"><div><h2>급한 일정 순서</h2><p>완료하지 않은 일정을 마감일이 가까운 순서로 정렬합니다.</p></div><label class="urgent-filter"><input type="checkbox" id="urgentShowDone"/> 완료 포함</label></div>
 <div class="urgent-list" id="urgentList"></div>
 <div class="empty-state" hidden="" id="urgentEmpty"><strong>등록된 일정이 없습니다.</strong><span>캘린더에서 날짜를 눌러 일정을 추가하세요.</span></div>
 </article>
+<article class="panel todo-panel">
+<div class="panel-head"><div><h2>할일 메모</h2><p>날짜와 상관없이 해야 할 일을 자유롭게 적어두세요.</p></div><label class="urgent-filter"><input type="checkbox" id="todoShowDone"/> 완료 포함</label></div>
+<form class="todo-add" id="todoForm"><input id="todoInput" autocomplete="off" placeholder="예: 세금계산서 정리, 거래처 연락, 재고 확인…" maxlength="200"/><button class="button primary" type="submit">추가</button></form>
+<div class="todo-list" id="todoList"></div>
+<div class="empty-state" hidden="" id="todoEmpty"><strong>할일이 없습니다.</strong><span>위 입력창에 할일을 적고 추가하세요.</span></div>
+</article>
+</div>
 </section>
 </div>
 </main>
@@ -346,6 +354,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.3.0" type="module"></script>
+<script src="/app.js?v=64.4.0" type="module"></script>
 </body>
 </html>
