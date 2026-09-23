@@ -922,6 +922,48 @@ function renderMonthlyPlan() {
 const PRIO_RANK = { high: 0, normal: 1, low: 2 };
 const PRIO_LABEL = { high: "높음", normal: "보통", low: "낮음" };
 function prioRank(e) { return PRIO_RANK[e.priority] ?? 1; }
+
+/* 대한민국 공휴일 (대체공휴일 포함) — 2025~2027 */
+const HOLIDAYS = {
+  // 2025
+  "2025-01-01": "신정",
+  "2025-01-27": "임시공휴일",
+  "2025-01-28": "설날 연휴", "2025-01-29": "설날", "2025-01-30": "설날 연휴",
+  "2025-03-01": "삼일절", "2025-03-03": "대체공휴일",
+  "2025-05-05": "어린이날·부처님오신날", "2025-05-06": "대체공휴일",
+  "2025-06-03": "대통령선거일",
+  "2025-06-06": "현충일",
+  "2025-08-15": "광복절",
+  "2025-10-03": "개천절",
+  "2025-10-05": "추석 연휴", "2025-10-06": "추석", "2025-10-07": "추석 연휴", "2025-10-08": "대체공휴일",
+  "2025-10-09": "한글날",
+  "2025-12-25": "성탄절",
+  // 2026
+  "2026-01-01": "신정",
+  "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴",
+  "2026-03-01": "삼일절", "2026-03-02": "대체공휴일",
+  "2026-05-05": "어린이날",
+  "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일",
+  "2026-06-06": "현충일",
+  "2026-08-15": "광복절", "2026-08-17": "대체공휴일",
+  "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴",
+  "2026-10-03": "개천절", "2026-10-05": "대체공휴일",
+  "2026-10-09": "한글날",
+  "2026-12-25": "성탄절",
+  // 2027
+  "2027-01-01": "신정",
+  "2027-02-05": "설날 연휴", "2027-02-06": "설날", "2027-02-07": "설날 연휴", "2027-02-08": "대체공휴일",
+  "2027-03-01": "삼일절",
+  "2027-05-05": "어린이날",
+  "2027-05-13": "부처님오신날",
+  "2027-06-06": "현충일",
+  "2027-08-15": "광복절", "2027-08-16": "대체공휴일",
+  "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴",
+  "2027-10-03": "개천절", "2027-10-04": "대체공휴일",
+  "2027-10-09": "한글날", "2027-10-11": "대체공휴일",
+  "2027-12-25": "성탄절", "2027-12-27": "대체공휴일",
+};
+function holidayName(dateStr) { return HOLIDAYS[dateStr] || null; }
 function dday(dateStr) {
   const a = new Date(dateStr + "T00:00:00");
   const b = new Date(todayStr() + "T00:00:00");
@@ -949,12 +991,16 @@ function renderCalendar() {
     if (d === null) return `<div class="cal-cell empty"></div>`;
     const dateStr = `${ui.calYear}-${String(ui.calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const dow = idx % 7;
+    const holiday = holidayName(dateStr);
     const evs = (byDate[dateStr] || []).slice().sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0) || prioRank(a) - prioRank(b));
-    const chips = evs.slice(0, 4).map((e) =>
+    const chips = evs.slice(0, holiday ? 3 : 4).map((e) =>
       `<div class="cal-ev prio-${e.priority || "normal"} ${e.done ? "done" : ""}" data-event-chip="${e.id}" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</div>`).join("");
-    const more = evs.length > 4 ? `<div class="cal-more">+${evs.length - 4}건</div>` : "";
-    return `<div class="cal-cell ${dateStr === today ? "today" : ""}" data-cal-date="${dateStr}">
-      <div class="cal-daynum ${dow === 0 ? "sun" : dow === 6 ? "sat" : ""}">${d}</div>${chips}${more}</div>`;
+    const shown = holiday ? 3 : 4;
+    const more = evs.length > shown ? `<div class="cal-more">+${evs.length - shown}건</div>` : "";
+    const dayCls = holiday ? "sun" : (dow === 0 ? "sun" : dow === 6 ? "sat" : "");
+    const holBadge = holiday ? `<div class="cal-holiday" title="${escapeHtml(holiday)}">${escapeHtml(holiday)}</div>` : "";
+    return `<div class="cal-cell ${dateStr === today ? "today" : ""} ${holiday ? "holiday" : ""}" data-cal-date="${dateStr}">
+      <div class="cal-daynum ${dayCls}">${d}</div>${holBadge}${chips}${more}</div>`;
   }).join("");
 }
 

@@ -455,6 +455,9 @@ small { font-size: 12px; }
 .cal-cell.today { border-color: var(--brand); background: var(--brand-soft); }
 .cal-daynum { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 .cal-daynum.sun { color: #e5544b; } .cal-daynum.sat { color: #3d8bff; }
+.cal-cell.holiday { background: #fdf1f0; border-color: #f6d3cf; }
+.cal-cell.holiday.today { background: var(--brand-soft); border-color: var(--brand); }
+.cal-holiday { font-size: 10px; font-weight: 600; color: #e5544b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
 .cal-ev { font-size: 11px; padding: 2px 6px; border-radius: 5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-ev.prio-high { background: #e5544b; } .cal-ev.prio-normal { background: #4f7bf0; } .cal-ev.prio-low { background: #8792ad; }
 .cal-ev.done { background: #cbd3e3; color: #7a839b; text-decoration: line-through; }
