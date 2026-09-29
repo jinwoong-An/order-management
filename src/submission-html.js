@@ -57,22 +57,25 @@ export async function buildSubmissionHtml(title) {
   }
 
   const NAME_TO_CODE = Object.fromEntries(ITEMS.map((i) => [i.name, i.code]));
-  const planValues = c.planValues || [];
-  const q4Sum = (code) => planValues
-    .filter((p) => Number(p.year) === YEAR && ((NAME_TO_CODE[p.item_label] || p.item_label) === code || p.item_label === CODE_NAME[code]))
-    .reduce((s, p) => s + num(p.next_budget), 0);
+  // 예산은 연간영업실적의 'ITEM별 BUDGET & 실적'(itemBudgets)에서 최신값을 합산
+  const itemBudgets = c.itemBudgets || [];
   const budgets = {};
-  ITEM_CODES.forEach((code) => {
-    const m = metrics.find((x) => Number(x.year) === YEAR && x.item === code);
-    const q2 = m ? num(m.q2_new_budget) : 0;
-    const q3 = m ? num(m.q3_new_budget) : 0;
-    const q4 = q4Sum(code);
-    budgets[code] = {
-      annBud: m ? num(m.budget) : 0,
-      q2, q3, q4,
-      qBud: q3 || q2 || (m ? num(m.budget) : 0),
-    };
-  });
+  ITEM_CODES.forEach((code) => (budgets[code] = { annBud: 0, q2: 0, q3: 0, q4: 0, qBud: 0 }));
+  for (const sec of itemBudgets) {
+    const code = NAME_TO_CODE[(sec.item || "").trim()];
+    if (!code || !budgets[code]) continue;
+    const cs = sec.customers || [];
+    budgets[code].annBud += cs.reduce((s, x) => s + num(x.budget), 0);
+    budgets[code].q2 += cs.reduce((s, x) => s + num(x.q2), 0);
+    budgets[code].q3 += cs.reduce((s, x) => s + num(x.q3), 0);
+    budgets[code].q4 += cs.reduce((s, x) => s + num(x.q4), 0);
+  }
+  ITEM_CODES.forEach((code) => { const b = budgets[code]; b.qBud = b.q4 || b.q3 || b.q2 || b.annBud; });
+  // 가장 최근에 입력된 분기(전체 합계 기준)
+  const totQ2 = ITEM_CODES.reduce((s, k) => s + budgets[k].q2, 0);
+  const totQ3 = ITEM_CODES.reduce((s, k) => s + budgets[k].q3, 0);
+  const totQ4 = ITEM_CODES.reduce((s, k) => s + budgets[k].q4, 0);
+  const qLabel = totQ4 > 0 ? "4분기" : totQ3 > 0 ? "3분기" : totQ2 > 0 ? "2분기" : "연간";
 
   const pipeline = [];
   for (const o of orders) {
@@ -107,7 +110,7 @@ export async function buildSubmissionHtml(title) {
 
   const safeTitle = title && title.trim() ? title.trim() : `${YEAR} JWA 실적 보고`;
   const generatedAt = new Date().toLocaleString("ko-KR");
-  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, monthlyPlans, maxMonth };
+  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, monthlyPlans, maxMonth, qLabel };
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -203,8 +206,8 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
     <div class="kpi"><div class="kpi-lbl">${YEAR} 실적 (YTD)</div><div class="kpi-val cb" id="k-ytd">-</div><div class="kpi-sub">계산서 발행 누계</div></div>
     <div class="kpi"><div class="kpi-lbl">연간 예산</div><div class="kpi-val" id="k-ann-bud">-</div><div class="kpi-sub">${YEAR} 전체 목표</div></div>
     <div class="kpi"><div class="kpi-lbl">연간 달성률</div><div class="kpi-val" id="k-ann-ach">-</div><div class="kpi-sub">연간 예산 대비</div></div>
-    <div class="kpi"><div class="kpi-lbl">3분기 예산</div><div class="kpi-val" id="k-q-bud">-</div><div class="kpi-sub">3분기 목표</div></div>
-    <div class="kpi"><div class="kpi-lbl">3분기 달성률</div><div class="kpi-val" id="k-q-ach">-</div><div class="kpi-sub">3분기 예산 대비</div></div>
+    <div class="kpi"><div class="kpi-lbl">${qLabel} 예산</div><div class="kpi-val" id="k-q-bud">-</div><div class="kpi-sub">${qLabel} 목표(최신 분기)</div></div>
+    <div class="kpi"><div class="kpi-lbl">${qLabel} 달성률</div><div class="kpi-val" id="k-q-ach">-</div><div class="kpi-sub">${qLabel} 예산 대비</div></div>
   </div>
   <div class="notice" id="notice" style="display:none"></div>
   <div class="filters">
@@ -214,8 +217,8 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
   </div>
   <div class="afd" id="afd">필터: <span>전체</span></div>
   <div class="grid">
-    <div class="card"><div class="ctitle">&#128230; 브랜드별 실적 · 연간예산 · 3분기예산 <span class="wtag">부진=빨강</span><button class="tgl" id="togPending" onclick="togglePending(this)">＋ 미발행 포함</button></div><div class="h155"><canvas id="cBrand"></canvas></div></div>
-    <div class="card"><div class="ctitle">&#127919; 달성률 (연간 vs 3분기) <span class="wtag">60% 미만 부진</span></div><div class="h190"><canvas id="cAch"></canvas></div></div>
+    <div class="card"><div class="ctitle">&#128230; 브랜드별 실적 · 연간예산 · ${qLabel}예산 <span class="wtag">부진=빨강</span><button class="tgl" id="togPending" onclick="togglePending(this)">＋ 미발행 포함</button></div><div class="h155"><canvas id="cBrand"></canvas></div></div>
+    <div class="card"><div class="ctitle">&#127919; 달성률 (연간 vs ${qLabel}) <span class="wtag">60% 미만 부진</span></div><div class="h190"><canvas id="cAch"></canvas></div></div>
     <div class="card fw"><div class="ctitle">&#128202; 브랜드별 월별 매출 추이 (단위: 원)</div><div class="h200"><canvas id="cBrandMonth"></canvas></div></div>
     <div class="card fw"><div class="ctitle">&#128200; 월별 총 매출 &amp; 누계 (단위: 원)</div><div class="h155"><canvas id="cMonth"></canvas></div></div>
     <div class="card"><div class="ctitle">&#129383; 제품군별 매출 비중</div><div class="h190"><canvas id="cProd"></canvas></div></div>
@@ -319,9 +322,9 @@ function initCharts(){
     {label:'실적(발행)',data:[],backgroundColor:[],borderRadius:2,barPercentage:.7,stack:'sales'},
     {label:'미발행(예정)',data:[],backgroundColor:'rgba(210,153,34,.9)',borderRadius:2,barPercentage:.7,stack:'sales',hidden:true},
     {label:'연간예산',data:[],backgroundColor:'rgba(88,166,255,.15)',borderColor:'rgba(88,166,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.7,stack:'ab'},
-    {label:'3분기예산',data:[],backgroundColor:'rgba(188,140,255,.12)',borderColor:'rgba(188,140,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.7,stack:'qb'}
+    {label:'${qLabel}예산',data:[],backgroundColor:'rgba(188,140,255,.12)',borderColor:'rgba(188,140,255,.5)',borderWidth:1,borderRadius:2,barPercentage:.7,stack:'qb'}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);},footer:function(items){if(!showPending)return'';var s=0;items.forEach(function(i){if(i.dataset.stack==='sales')s+=i.raw;});return '총 발주: '+fmtT(s);}}}},scales:{x:{stacked:true,grid:{color:'#21262d'}},y:{stacked:true,ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
-  ch2=new Chart(document.getElementById('cAch'),{type:'bar',data:{labels:[],datasets:[{label:'연간 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42},{label:'3분기 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+(c.raw*100).toFixed(1)+'%';}}}},scales:{x:{min:0,max:1.3,ticks:{callback:function(v){return(v*100).toFixed(0)+'%';}},grid:{color:'#21262d'}}}}});
+  ch2=new Chart(document.getElementById('cAch'),{type:'bar',data:{labels:[],datasets:[{label:'연간 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42},{label:'${qLabel} 달성률',data:[],backgroundColor:[],borderRadius:3,barPercentage:.42}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+(c.raw*100).toFixed(1)+'%';}}}},scales:{x:{min:0,max:1.3,ticks:{callback:function(v){return(v*100).toFixed(0)+'%';}},grid:{color:'#21262d'}}}}});
   ch3=new Chart(document.getElementById('cBrandMonth'),{type:'bar',data:{labels:mlabels,datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{stacked:true,grid:{color:'#21262d'}},y:{stacked:true,ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
   ch4=new Chart(document.getElementById('cMonth'),{type:'bar',data:{labels:mlabels,datasets:[{label:'월 실적',data:[],backgroundColor:'rgba(88,166,255,.6)',borderRadius:3,barPercentage:.5},{label:'누계',type:'line',data:[],borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.07)',fill:true,tension:.35,pointRadius:3,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10,padding:8}},tooltip:{callbacks:{label:function(c){return' '+c.dataset.label+': '+fmtT(c.raw);}}}},scales:{x:{grid:{color:'#21262d'}},y:{ticks:{callback:function(v){return fmtA(v);}},grid:{color:'#21262d'}}}}});
   ch5=new Chart(document.getElementById('cProd'),{type:'doughnut',data:{labels:[],datasets:[{data:[],backgroundColor:[],borderColor:'#0d1117',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{boxWidth:10,padding:7}},tooltip:{callbacks:{label:function(c){var s=c.chart.data.datasets[0].data.reduce(function(a,b){return a+b;},0);return' '+c.label+': '+fmtT(c.raw)+' ('+((c.raw/s)*100).toFixed(1)+'%)';}}}}}});

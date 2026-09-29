@@ -563,12 +563,14 @@ function renderPerformance() {
   // ITEM별 실적 테이블 — 새 ITEM별 BUDGET(엑셀) 기준 · ETC 상품은 동반 품목에 배분됨
   let budgetSum = 0;
   let invAmt = 0;
+  let q2Sum = 0; let q3Sum = 0; let q4Sum = 0;
   $("itemPerformanceBody").innerHTML = secs.map((sec) => {
     const cs = sec.customers || [];
     const budget = cs.reduce((s, c) => s + parseNum(c.budget), 0);
     const q2 = cs.reduce((s, c) => s + parseNum(c.q2), 0);
     const q3 = cs.reduce((s, c) => s + parseNum(c.q3), 0);
     const q4 = cs.reduce((s, c) => s + parseNum(c.q4), 0);
+    q2Sum += q2; q3Sum += q3; q4Sum += q4;
     const secActuals = actualsMap.get((sec.item || "").trim().toUpperCase()) || new Map();
     let total = 0; let custN = 0;
     for (const v of secActuals.values()) { total += v.amount; if (v.amount > 0) custN += 1; }
@@ -590,8 +592,16 @@ function renderPerformance() {
   $("itemReconcileBadge").textContent = `실적 합계 ${won(invAmt)}`;
   $("itemReconcileBadge").className = "reconcile-badge ok";
 
+  // 가장 최근 입력 분기의 BUDGET & 달성률
+  const qLabel = q4Sum > 0 ? "4분기" : q3Sum > 0 ? "3분기" : q2Sum > 0 ? "2분기" : "연간";
+  const qBudget = q4Sum > 0 ? q4Sum : q3Sum > 0 ? q3Sum : q2Sum > 0 ? q2Sum : budgetSum;
+
   $("perfBudgetAmount").textContent = budgetSum ? won(budgetSum) : "-";
   $("perfBudgetYearLabel").textContent = `${year}년`;
+  $("perfQBudgetLabel").textContent = `${qLabel} BUDGET`;
+  $("perfQBudgetAmount").textContent = qBudget ? won(qBudget) : "-";
+  $("perfQAchLabel").textContent = `${qLabel} 달성률`;
+  $("perfQAchievementRate").textContent = qBudget ? `${Math.round((invAmt / qBudget) * 1000) / 10}%` : "-";
   $("perfInvoiceAmount").textContent = won(invAmt);
   $("perfYearLabel").textContent = `${year}년 세금계산서 기준`;
   $("perfAchievementRate").textContent = budgetSum ? `${Math.round((invAmt / budgetSum) * 1000) / 10}%` : "-";

@@ -143,6 +143,8 @@ small { font-size: 12px; }
 .accent-teal .kpi-icon { background: var(--teal); }
 .accent-violet .kpi-icon { background: var(--violet); }
 .accent-orange .kpi-icon { background: var(--orange); }
+.accent-purple .kpi-icon { background: #7c5cff; }
+.accent-rose .kpi-icon { background: #e5544b; }
 
 /* ============ 테이블 공통 ============ */
 .table-scroll { overflow-x: auto; border-radius: var(--radius-sm); }

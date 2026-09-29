@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=65.2.0" rel="stylesheet"/>
+<link href="/styles.css?v=65.3.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -116,8 +116,10 @@
 <section class="view-section" hidden="" id="performanceView">
 <div class="kpi-grid performance-kpis">
 <article class="kpi-card accent-violet"><div class="kpi-icon">B</div><div><span>올해 BUDGET</span><strong id="perfBudgetAmount">-</strong><small id="perfBudgetYearLabel">선택 연도</small></div></article>
+<article class="kpi-card accent-purple"><div class="kpi-icon">Q</div><div><span id="perfQBudgetLabel">최신 분기 BUDGET</span><strong id="perfQBudgetAmount">-</strong><small>가장 최근 입력 분기</small></div></article>
 <article class="kpi-card accent-teal"><div class="kpi-icon">₩</div><div><span>현재 TOTAL 금액</span><strong id="perfInvoiceAmount">0</strong><small id="perfYearLabel">세금계산서 기준</small></div></article>
-<article class="kpi-card accent-orange"><div class="kpi-icon">%</div><div><span>달성율</span><strong id="perfAchievementRate">-</strong><small>BUDGET 대비 현재 TOTAL</small></div></article>
+<article class="kpi-card accent-orange"><div class="kpi-icon">%</div><div><span>연간 달성률</span><strong id="perfAchievementRate">-</strong><small>올해 BUDGET 대비</small></div></article>
+<article class="kpi-card accent-rose"><div class="kpi-icon">%</div><div><span id="perfQAchLabel">최신 분기 달성률</span><strong id="perfQAchievementRate">-</strong><small>최신 분기 BUDGET 대비</small></div></article>
 <article class="kpi-card accent-indigo"><div class="kpi-icon">#</div><div><span>계산서 건수</span><strong id="perfInvoiceCount">0건</strong><small>발행일 입력 기준</small></div></article>
 <article class="kpi-card accent-blue"><div class="kpi-icon">C</div><div><span>거래업체 수</span><strong id="perfCustomerCount">0곳</strong><small>계산서 발행 거래처</small></div></article>
 </div>
@@ -372,6 +374,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=65.2.0" type="module"></script>
+<script src="/app.js?v=65.3.0" type="module"></script>
 </body>
 </html>
