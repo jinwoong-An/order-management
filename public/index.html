@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=65.0.0" rel="stylesheet"/>
+<link href="/styles.css?v=65.2.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -130,7 +130,7 @@
 <article class="panel compact-bucket-panel"><div class="panel-head"><div><h2>거래금액별 업체</h2><p>세금계산서 기준 연간 거래금액 구간입니다. 버튼을 누르면 업체 상세가 표시됩니다.</p></div></div><div class="amount-bucket-grid compact" id="amountBucketGrid"></div></article>
 
 <article class="panel item-budget-panel">
-<div class="panel-head"><div><h2>ITEM별 BUDGET &amp; 실적 (분기별)</h2><p>예산 열(2025 실적·2026 예산·2·3·4분기)은 직접 입력하면 자동 저장됩니다. <strong>2026 TOTAL</strong>은 발주 및 납품 관리에서 <strong>세금계산서가 발행된(처리 완료) 건</strong>을 업체별로 자동 집계하며, 표에 없는 업체는 각 ITEM의 <strong>ETC</strong> 행으로 모입니다. 업체·ITEM 행도 추가/삭제할 수 있습니다.</p></div><span class="reconcile-badge ok" id="itemBudgetGrandBadge">합계</span></div>
+<div class="panel-head"><div><h2>ITEM별 BUDGET &amp; 실적 (분기별)</h2><p>예산 열(2025 실적·2026 예산·2·3·4분기)은 직접 입력하면 자동 저장됩니다. <strong>2026 TOTAL</strong>은 발주 및 납품 관리에서 <strong>세금계산서가 발행된(처리 완료) 건</strong>을 업체별로 자동 집계하며(파란색), 표에 없는 업체는 각 ITEM의 <strong>ETC</strong> 행으로 모입니다. TOTAL 값을 <strong>직접 입력하면 그 값이 우선(주황색)</strong>되고, 비우면 다시 자동집계로 돌아갑니다. 업체·ITEM 행도 추가/삭제할 수 있습니다.</p></div><span class="reconcile-badge ok" id="itemBudgetGrandBadge">합계</span></div>
 <div class="item-budget-grid" id="itemBudgetGrid"></div>
 <button class="button secondary add-item-budget-btn" id="addItemBudgetBtn" type="button"><svg viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>ITEM 추가</span></button>
 </article>
@@ -372,6 +372,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=65.0.0" type="module"></script>
+<script src="/app.js?v=65.2.0" type="module"></script>
 </body>
 </html>

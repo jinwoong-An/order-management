@@ -304,6 +304,10 @@ small { font-size: 12px; }
 .ib-table tfoot .ib-total-row td { border-top: 2px solid var(--line); background: var(--brand-soft); font-weight: 700; }
 .ib-total-head { background: #eef4ff; }
 .ib-total-cell { font-weight: 700; color: #2b6fd6; background: #f5f9ff; }
+.ib-total-input { width: 96px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; text-align: right; font-size: 13px; font-weight: 700; background: #f5f9ff; }
+.ib-total-input:focus { border-color: var(--brand); outline: none; background: #fff; }
+.ib-total-input.ib-total-auto { color: #2b6fd6; }            /* 발주 자동집계 값 */
+.ib-total-input.ib-total-manual { color: #b7791f; background: #fff8ec; border-color: #f0d9a8; } /* 수동 입력(우선) */
 .ib-synth td { background: #fafbff; color: var(--muted); font-style: italic; }
 .ib-synth .ib-total-cell { color: #2b6fd6; font-style: normal; }
 .ib-rowdel { width: 34px; text-align: center; }

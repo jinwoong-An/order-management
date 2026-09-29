@@ -689,34 +689,37 @@ function ibActualsByItem(year) {
   }
   return map;
 }
-// 섹션별 실적 계산 → { totalsById:{custId:amount}, etcExtra:number(ETC행 없을 때 남는 금액), colTotal:number }
-const IB_TOTALS = {}; // custId -> 계산된 TOTAL (저장 시 사용)
+// 섹션별 실적 계산.
+// autoById: 발주 자동집계 값(업체별), totalsById: 실제 표시/합계용(수동 입력이 있으면 그 값 우선),
+// etcExtra: ETC행이 없을 때 남는 미매칭 금액, colTotal: 섹션 합계(수동 반영)
+function ibIsManual(c) { return c && c.totalOverride !== null && c.totalOverride !== undefined && c.totalOverride !== ""; }
 function ibComputeSection(sec, actualsMap) {
   const secActuals = actualsMap.get((sec.item || "").trim().toUpperCase()) || new Map();
   const custs = sec.customers || [];
   const etcIdx = custs.findIndex((c) => ibNorm(c.name) === "etc");
   const matched = new Set();
-  const totalsById = {};
+  const autoById = {};
   custs.forEach((c, i) => {
     if (i === etcIdx) return;
     const k = ibNorm(c.name);
-    if (k && secActuals.has(k)) { totalsById[c.id] = secActuals.get(k).amount; matched.add(k); }
-    else totalsById[c.id] = 0;
+    if (k && secActuals.has(k)) { autoById[c.id] = secActuals.get(k).amount; matched.add(k); }
+    else autoById[c.id] = 0;
   });
   let leftover = 0;
   for (const [k, v] of secActuals) if (!matched.has(k)) leftover += v.amount;
   let etcExtra = 0;
-  if (etcIdx >= 0) totalsById[custs[etcIdx].id] = leftover;
+  if (etcIdx >= 0) autoById[custs[etcIdx].id] = leftover;
   else etcExtra = leftover;
+  const totalsById = {};
+  custs.forEach((c) => { totalsById[c.id] = ibIsManual(c) ? parseNum(c.totalOverride) : (autoById[c.id] || 0); });
   const colTotal = Object.values(totalsById).reduce((s, v) => s + v, 0) + etcExtra;
-  return { totalsById, etcExtra, colTotal };
+  return { autoById, totalsById, etcExtra, colTotal };
 }
 function renderItemBudgets() {
   const grid = $("itemBudgetGrid");
   if (!grid) return;
   const secs = store.itemBudgets || [];
   const actualsMap = ibActualsByItem(ui.year);
-  for (const k of Object.keys(IB_TOTALS)) delete IB_TOTALS[k];
 
   grid.innerHTML = secs.map((sec) => {
     const comp = ibComputeSection(sec, actualsMap);
@@ -724,18 +727,19 @@ function renderItemBudgets() {
     for (const f of IB_EDIT_FIELDS) editTotals[f.key] = (sec.customers || []).reduce((s, c) => s + parseNum(c[f.key]), 0);
 
     const rows = (sec.customers || []).map((c) => {
-      const rt = comp.totalsById[c.id] || 0;
-      IB_TOTALS[c.id] = rt;
+      const manual = ibIsManual(c);
+      const auto = comp.autoById[c.id] || 0;
+      const shown = manual ? parseNum(c.totalOverride) : auto;
       return `<tr data-ib-cust="${c.id}">
         <td><input class="ib-cell-name" value="${escapeHtml(c.name || "")}" placeholder="업체명"/></td>
         ${IB_EDIT_FIELDS.map((f) => `<td class="number"><input class="ib-cell" data-ib-field="${f.key}" inputmode="numeric" value="${ibCellVal(c[f.key])}" placeholder="0"/></td>`).join("")}
-        <td class="number ib-total-cell" title="발주(세금계산서) 자동 집계">${rt ? won(rt) : "-"}</td>
+        <td class="number"><input class="ib-total-input ${manual ? "ib-total-manual" : "ib-total-auto"}" data-ib-auto="${manual ? "0" : "1"}" data-ib-autoval="${auto}" inputmode="numeric" value="${shown ? won(shown) : ""}" placeholder="자동${auto ? " " + won(auto) : ""}" title="발주 자동집계값입니다. 직접 입력하면 그 값이 우선되고, 비우면 다시 자동집계로 돌아갑니다."/></td>
         <td class="ib-rowdel"><button class="mini-btn danger" data-ib-del-cust title="업체 삭제">✕</button></td>
       </tr>`;
     }).join("");
     // ETC 행이 없는데 미매칭 실적이 있으면 자동집계 행 표시(읽기전용)
     const synth = comp.etcExtra > 0
-      ? `<tr class="ib-synth"><td>ETC <small>(자동집계)</small></td>${IB_EDIT_FIELDS.map(() => `<td class="number muted">-</td>`).join("")}<td class="number ib-total-cell strong">${won(comp.etcExtra)}</td><td class="ib-rowdel"></td></tr>`
+      ? `<tr class="ib-synth"><td>ETC <small>(자동집계)</small></td>${IB_EDIT_FIELDS.map(() => `<td class="number muted">-</td>`).join("")}<td class="number ib-total-cell strong" data-ib-synthtotal="${comp.etcExtra}">${won(comp.etcExtra)}</td><td class="ib-rowdel"></td></tr>`
       : "";
 
     return `<div class="ib-section" data-ib-section="${sec.id}">
@@ -745,9 +749,9 @@ function renderItemBudgets() {
       </div>
       <div class="table-scroll">
       <table class="data-table ib-table">
-        <thead><tr><th>업체</th>${IB_EDIT_FIELDS.map((f) => `<th class="number">${f.label}</th>`).join("")}<th class="number ib-total-head">2026 TOTAL<br><small>발주 자동집계</small></th><th class="ib-rowdel"></th></tr></thead>
+        <thead><tr><th>업체</th>${IB_EDIT_FIELDS.map((f) => `<th class="number">${f.label}</th>`).join("")}<th class="number ib-total-head">2026 TOTAL<br><small>발주 자동집계·수정가능</small></th><th class="ib-rowdel"></th></tr></thead>
         <tbody>${rows || `<tr><td colspan="8" class="muted">업체를 추가하세요.</td></tr>`}${synth}</tbody>
-        <tfoot><tr class="ib-total-row"><td>TOTAL</td>${IB_EDIT_FIELDS.map((f) => `<td class="number strong" data-ib-foot="${f.key}">${won(editTotals[f.key])}</td>`).join("")}<td class="number strong">${won(comp.colTotal)}</td><td class="ib-rowdel"></td></tr></tfoot>
+        <tfoot><tr class="ib-total-row"><td>TOTAL</td>${IB_EDIT_FIELDS.map((f) => `<td class="number strong" data-ib-foot="${f.key}">${won(editTotals[f.key])}</td>`).join("")}<td class="number strong" data-ib-foot-total>${won(comp.colTotal)}</td><td class="ib-rowdel"></td></tr></tfoot>
       </table>
       </div>
       <button class="button subtle small ib-add-cust" data-ib-add-cust type="button">+ 업체 추가</button>
@@ -772,7 +776,10 @@ function collectItemBudgets() {
         const raw = inp.value.trim();
         cust[inp.dataset.ibField] = raw === "" ? null : parseNum(raw);
       });
-      cust.total = IB_TOTALS[cid] || 0; // 발주 자동집계 값 보존
+      // TOTAL: 자동집계(data-ib-auto=1)면 null(계속 자동), 수동 입력이면 그 값을 override로 저장
+      const tot = tr.querySelector(".ib-total-input");
+      const raw = tot ? tot.value.trim() : "";
+      cust.totalOverride = (!tot || tot.dataset.ibAuto === "1" || raw === "") ? null : parseNum(raw);
       customers.push(cust);
     });
     secs.push({ id, item, customers });
@@ -790,6 +797,13 @@ function recalcIbSection(secEl) {
     tr.querySelectorAll(".ib-cell").forEach((inp) => { t[inp.dataset.ibField] += parseNum(inp.value); });
   });
   secEl.querySelectorAll("[data-ib-foot]").forEach((td) => { td.textContent = won(t[td.dataset.ibFoot]); });
+  // TOTAL 열 합계(수동 입력 반영) = 각 행 total-input 값 + ETC 자동집계 행
+  let colTotal = 0;
+  secEl.querySelectorAll(".ib-total-input").forEach((inp) => { colTotal += parseNum(inp.value); });
+  const synth = secEl.querySelector("[data-ib-synthtotal]");
+  if (synth) colTotal += parseNum(synth.dataset.ibSynthtotal);
+  const footTotal = secEl.querySelector("[data-ib-foot-total]");
+  if (footTotal) footTotal.textContent = won(colTotal);
   const grand = $$("#itemBudgetGrid .ib-section").reduce((s, el) => {
     let b = 0; el.querySelectorAll('.ib-cell[data-ib-field="budget"]').forEach((i) => { b += parseNum(i.value); }); return s + b;
   }, 0);
@@ -800,7 +814,7 @@ async function ibAddCustomer(secId) {
   const sec = store.itemBudgets.find((s) => s.id === secId);
   if (!sec) return;
   sec.customers = sec.customers || [];
-  sec.customers.push({ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, total: null });
+  sec.customers.push({ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, totalOverride: null });
   await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
   renderItemBudgets();
 }
@@ -814,7 +828,7 @@ async function ibDeleteCustomer(secId, custId) {
 }
 async function ibAddItem() {
   store.itemBudgets = collectItemBudgets();
-  store.itemBudgets.push({ id: ibNewId("ib"), item: "새 ITEM", customers: [{ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, total: null }] });
+  store.itemBudgets.push({ id: ibNewId("ib"), item: "새 ITEM", customers: [{ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, totalOverride: null }] });
   await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
   renderItemBudgets();
 }
@@ -1918,16 +1932,24 @@ function bindEvents() {
   $("addItemBudgetBtn").addEventListener("click", ibAddItem);
   const ibGrid = $("itemBudgetGrid");
   ibGrid.addEventListener("input", (e) => {
-    const cell = e.target.closest(".ib-cell");
+    const cell = e.target.closest(".ib-cell, .ib-total-input");
     if (!cell) return;
     const caretEnd = cell.selectionStart === cell.value.length;
     const n = parseNum(cell.value);
     cell.value = cell.value.trim() === "" ? "" : (n ? won(n) : "");
     if (caretEnd) cell.setSelectionRange(cell.value.length, cell.value.length);
+    // TOTAL 칸: 입력하면 수동(우선), 비우면 자동집계로 표시
+    if (cell.classList.contains("ib-total-input")) {
+      const empty = cell.value.trim() === "";
+      cell.dataset.ibAuto = empty ? "1" : "0";
+      cell.classList.toggle("ib-total-manual", !empty);
+      cell.classList.toggle("ib-total-auto", empty);
+    }
     const secEl = cell.closest(".ib-section");
     if (secEl) recalcIbSection(secEl);
   });
   ibGrid.addEventListener("change", (e) => {
+    if (e.target.closest(".ib-total-input")) { saveItemBudgets().then(renderItemBudgets); return; }
     if (e.target.closest(".ib-cell, .ib-cell-name, .ib-item-name")) saveItemBudgets();
   });
   ibGrid.addEventListener("click", (e) => {
