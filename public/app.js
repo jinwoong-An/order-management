@@ -1628,16 +1628,18 @@ function restoreFromFile(file) {
   };
   reader.readAsText(file);
 }
-async function createSubmissionHtml() {
+async function createSubmissionHtml(type) {
   const title = $("submissionTitle").value.trim();
-  $("submissionHtmlStatus").textContent = "생성 중...";
+  const kind = type === "quarterly" ? "분기회의" : "월간회의";
+  $("submissionHtmlStatus").textContent = `${kind} 제출용 생성 중...`;
   try {
-    const res = await api("/api/submission", { method: "POST", body: { title } });
+    const res = await api("/api/submission", { method: "POST", body: { title, type: type || "monthly" } });
     const blob = new Blob([res.html], { type: "text/html;charset=utf-8" });
-    const name = (title || "발주관리앱-제출본").replace(/[\\/:*?"<>|]/g, "_") + ".html";
+    const base = title || `발주관리앱-${kind}-제출본`;
+    const name = base.replace(/[\\/:*?"<>|]/g, "_") + ".html";
     triggerDownload(blob, name);
-    $("submissionHtmlStatus").textContent = "생성 완료! 다운로드된 .html 파일을 이메일에 첨부하세요.";
-    toast("제출용 HTML을 생성했습니다.", "success");
+    $("submissionHtmlStatus").textContent = `${kind} 제출용 생성 완료! 다운로드된 .html 파일을 이메일에 첨부하세요.`;
+    toast(`${kind} 제출용 HTML을 생성했습니다.`, "success");
   } catch (e) {
     $("submissionHtmlStatus").textContent = "생성 실패: " + e.message;
   }
@@ -1795,7 +1797,8 @@ function bindEvents() {
   $("restoreButton").addEventListener("click", () => $("restoreFile").click());
   $("restoreFile").addEventListener("change", (e) => { if (e.target.files[0]) restoreFromFile(e.target.files[0]); e.target.value = ""; });
   $("submissionButton").addEventListener("click", () => $("submissionDialog").showModal());
-  $("createSubmissionHtmlButton").addEventListener("click", createSubmissionHtml);
+  $("createMonthlyHtmlButton").addEventListener("click", () => createSubmissionHtml("monthly"));
+  $("createQuarterlyHtmlButton").addEventListener("click", () => createSubmissionHtml("quarterly"));
   $("importButton").addEventListener("click", () => $("excelFile").click());
   $("excelFile").addEventListener("change", (e) => { if (e.target.files[0]) importExcel(e.target.files[0]); e.target.value = ""; });
   $("exportButton").addEventListener("click", exportExcel);

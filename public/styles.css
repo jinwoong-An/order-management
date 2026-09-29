@@ -290,6 +290,9 @@ small { font-size: 12px; }
 .yearly-input { width: 80px; }
 .plan-next-input:focus, .yearly-input:focus { border-color: var(--brand); outline: none; }
 
+.submission-type-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.submission-type-buttons .button { flex: 1; min-width: 160px; }
+
 /* ITEM별 BUDGET & 실적 편집 그리드 */
 .item-budget-grid { display: flex; flex-direction: column; gap: 22px; }
 .ib-section { border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; background: var(--panel); }

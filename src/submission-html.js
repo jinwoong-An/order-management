@@ -13,7 +13,8 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function buildSubmissionHtml(title) {
+export async function buildSubmissionHtml(title, type) {
+  if (type === "quarterly") return buildQuarterlyHtml(title);
   const snap = await snapshot();
   const c = snap.collections;
   const orders = c.orders || [];
@@ -394,4 +395,470 @@ window.addEventListener('DOMContentLoaded',function(){
 <\/script>
 </body>
 </html>`;
+}
+
+
+async function buildQuarterlyHtml(title) {
+  const snap = await snapshot();
+  const c = snap.collections;
+  const orders = c.orders || [];
+  const itemBudgets = c.itemBudgets || [];
+  const ITEM_CODES = ITEMS.map((i) => i.code);
+  const CODE_NAME = Object.fromEntries(ITEMS.map((i) => [i.code, i.name]));
+  const yOf = (d) => (d ? Number(String(d).slice(0, 4)) : 0);
+  const orderTotal = (o) => { const a = num(o.amount); if (a) return a; return (o.items || []).reduce((s, it) => s + num(it.amount), 0); };
+  const invYears = orders.map((o) => yOf(o.invoiceDate)).filter(Boolean);
+  const YEAR = invYears.length ? Math.max(...invYears) : new Date().getFullYear();
+  const norm = (s) => String(s || "").trim().replace(/[.．\s]+$/g, "").replace(/\s+/g, " ").toLowerCase();
+  function distByItem(filterFn) {
+    const map = new Map();
+    const add = (itemName, cust, amt) => { const k = String(itemName).toUpperCase(); if (!map.has(k)) map.set(k, new Map()); const m = map.get(k); const nk = norm(cust); if (!m.has(nk)) m.set(nk, { name: cust, amount: 0 }); m.get(nk).amount += amt; };
+    for (const o of orders) {
+      if (!filterFn(o)) continue;
+      const cust = (o.customer || "").trim() || "미지정";
+      const linesA = (o.items && o.items.length) ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
+      const nonEtc = linesA.filter((it) => ITEM_CODES.includes(it.item) && it.item !== "ETC");
+      const etcAmt = linesA.reduce((s, it) => s + ((!ITEM_CODES.includes(it.item) || it.item === "ETC") ? num(it.amount) : 0), 0);
+      const nonEtcSum = nonEtc.reduce((s, it) => s + num(it.amount), 0);
+      if (nonEtc.length) { for (const it of nonEtc) { const base = num(it.amount); const share = nonEtcSum > 0 ? etcAmt * (base / nonEtcSum) : etcAmt / nonEtc.length; add(CODE_NAME[it.item] || it.item, cust, base + share); } }
+    }
+    return map;
+  }
+  const invMap = distByItem((o) => yOf(o.invoiceDate) === YEAR);
+  const unpaidMap = distByItem((o) => !o.invoiceDate && (yOf(o.orderDate) === YEAR || yOf(o.dueDate) === YEAR || yOf(o.deliveryDate) === YEAR));
+  const BRANDS = [], BD = {}, COMPS = [], UNPAID = {};
+  let T = { r25: 0, b: 0, q2b: 0, q3b: 0, r26: 0 }, UNPAID_TOTAL = 0;
+  for (const sec of itemBudgets) {
+    const name = (sec.item || "").trim(); if (!name) continue;
+    BRANDS.push(name);
+    const key = name.toUpperCase();
+    const secInv = invMap.get(key) || new Map();
+    const custs = sec.customers || [];
+    const etcIdx = custs.findIndex((x) => norm(x.name) === "etc");
+    const matched = new Set();
+    const compRows = [];
+    let r25 = 0, b = 0, q2b = 0, q3b = 0;
+    custs.forEach((x, i) => {
+      const cr25 = num(x.result), cb = num(x.budget), cq2 = num(x.q2), cq3 = num(x.q3);
+      r25 += cr25; b += cb; q2b += cq2; q3b += cq3;
+      const ov = (x.totalOverride !== null && x.totalOverride !== undefined && x.totalOverride !== "");
+      let cr26;
+      if (ov) cr26 = num(x.totalOverride);
+      else if (i === etcIdx) cr26 = 0;
+      else { const nk = norm(x.name); if (nk && secInv.has(nk)) { cr26 = secInv.get(nk).amount; matched.add(nk); } else cr26 = 0; }
+      compRows.push({ brand: name, name: x.name || "", r25: cr25, b: cb, q2b: cq2, q3b: cq3, r26: cr26, _etc: i === etcIdx, _ov: ov });
+    });
+    let leftover = 0; for (const [nk, v] of secInv) if (!matched.has(nk)) leftover += v.amount;
+    if (etcIdx >= 0) { if (!compRows[etcIdx]._ov) compRows[etcIdx].r26 = leftover; }
+    else if (leftover > 0) compRows.push({ brand: name, name: "ETC", r25: 0, b: 0, q2b: 0, q3b: 0, r26: leftover });
+    let r26 = 0;
+    compRows.forEach((r) => { r26 += r.r26; COMPS.push({ brand: r.brand, name: r.name, r25: Math.round(r.r25), b: Math.round(r.b), q2b: Math.round(r.q2b), q3b: Math.round(r.q3b), r26: Math.round(r.r26) }); });
+    BD[name] = { r25: Math.round(r25), b: Math.round(b), q2b: Math.round(q2b), q3b: Math.round(q3b), r26: Math.round(r26) };
+    const secUn = unpaidMap.get(key) || new Map();
+    let un = 0; for (const v of secUn.values()) un += v.amount;
+    UNPAID[name] = Math.round(un); UNPAID_TOTAL += un;
+    T.r25 += r25; T.b += b; T.q2b += q2b; T.q3b += q3b; T.r26 += r26;
+  }
+  const TOTAL = { r25: Math.round(T.r25), b: Math.round(T.b), q2b: Math.round(T.q2b), q3b: Math.round(T.q3b), r26: Math.round(T.r26) };
+  UNPAID_TOTAL = Math.round(UNPAID_TOTAL);
+  const docTitle = (title && title.trim()) ? title.trim() : (YEAR + " JWA 분기 회의 대시보드");
+  const today = new Date().toLocaleDateString("ko-KR");
+  const j = (o) => JSON.stringify(o).replace(/</g, "\\u003c");
+  const dataJs = "const TOTAL=" + j(TOTAL) + ";\nconst BRANDS=" + j(BRANDS) + ";\nconst BD=" + j(BD) + ";\nconst UNPAID=" + j(UNPAID) + ";\nconst UNPAID_TOTAL=" + UNPAID_TOTAL + ";\nconst COMPS=" + j(COMPS) + ";";
+  return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(docTitle)}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5}
+header{background:linear-gradient(135deg,#161b22,#0a0d14);border-bottom:1px solid #21262d;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:15px;font-weight:700;color:#58a6ff}
+.sub{color:#8b949e;font-size:11px}
+.hright{display:flex;align-items:center;gap:10px}
+.crumb{font-size:12px;color:#58a6ff;font-weight:600}
+.hdate{font-size:11px;color:#6e7681}
+.upbtn{padding:6px 15px;border-radius:20px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px;font-weight:700;display:flex;align-items:center;gap:7px;transition:all .25s;white-space:nowrap}
+.upbtn:hover{border-color:#f0b800;color:#e6edf3}
+.upbtn.on{background:#1c1400;border-color:#f0b800;color:#f0c050;box-shadow:0 0 18px 3px rgba(240,184,0,.4)}
+.updot{width:7px;height:7px;border-radius:50%;background:#6e7681;flex-shrink:0;transition:all .25s}
+.upbtn.on .updot{background:#f0c050;box-shadow:0 0 10px 4px rgba(240,184,0,.95)}
+@keyframes kG{0%{box-shadow:0 0 0 0 rgba(240,184,0,.9)}50%{box-shadow:0 0 30px 10px rgba(240,184,0,.5)}100%{box-shadow:0 0 0 0 rgba(240,184,0,0)}}
+@keyframes vP{0%{transform:scale(1)}35%{transform:scale(1.14);color:#f0c050;text-shadow:0 0 18px rgba(240,184,0,1)}100%{transform:scale(1);text-shadow:none}}
+@keyframes cG{0%{border-color:#21262d}50%{border-color:#f0b800;box-shadow:0 0 20px 4px rgba(240,184,0,.3)}100%{border-color:#21262d;box-shadow:none}}
+.kpi.kg{animation:kG 1.3s ease-out}
+.kval.vp{animation:vP 1s ease-out}
+.cc.cg,.cc-full.cg{animation:cG 1.4s ease-out}
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;padding:10px 20px;border-bottom:1px solid #21262d}
+.kpi{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px 13px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--ac,#388bfd)}
+.klbl{color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kval{font-size:15px;font-weight:700;margin-top:3px;line-height:1.1}
+.ksub{color:#6e7681;font-size:10px;margin-top:2px}
+.pb{height:3px;background:#21262d;border-radius:2px;margin-top:5px;overflow:hidden}
+.pbf{height:100%;border-radius:2px;transition:width .5s ease}
+.filters{padding:8px 20px;border-bottom:1px solid #21262d;background:#090c11}
+.frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.frow+.frow{margin-top:6px}
+.flbl{font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;min-width:48px}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+.pill{padding:3px 9px;border-radius:20px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;user-select:none}
+.pill:hover{border-color:#58a6ff;color:#e6edf3;background:#1c2128}
+.pill.active{background:#1f6feb;border-color:#388bfd;color:#fff}
+.pill.bad{border-color:rgba(218,54,51,.5);color:#c9615e}
+.pill.bad.active{background:#da3633;border-color:#f85149;color:#fff}
+.badge{font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700;line-height:1.4}
+.br{background:rgba(248,81,73,.2);color:#f85149}
+.bg{background:rgba(63,185,80,.2);color:#3fb950}
+.bn{background:rgba(110,118,129,.2);color:#8b949e}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:10px 20px 0}
+.cc{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:13px}
+.ctitle{font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between}
+.ctitle-left{display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cw{position:relative;height:200px}
+.leg{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+.li{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b949e}
+.ld{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.tscroll{max-height:200px;overflow-y:auto;overflow-x:auto}
+.tscroll::-webkit-scrollbar{width:3px;height:3px}
+.tscroll::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+.tbl{width:100%;border-collapse:collapse;font-size:11px;min-width:530px}
+.tbl th{color:#6e7681;font-weight:600;text-align:left;padding:4px 6px;border-bottom:1px solid #21262d;font-size:10px;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;background:#161b22;z-index:1}
+.tbl td{padding:5px 6px;border-bottom:1px solid rgba(33,38,45,.6);white-space:nowrap}
+.tbl tr:hover td{background:rgba(88,166,255,.04)}
+.n{text-align:right;color:#8b949e;font-variant-numeric:tabular-nums}
+.nw{text-align:right;font-variant-numeric:tabular-nums}
+.rc{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.br-row{background:rgba(248,81,73,.03)}
+.br-row td:first-child{color:#f85149}
+.nm{font-weight:600;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:9px;padding:1px 4px;border-radius:4px;font-weight:700;display:inline-block}
+.tag-up{background:rgba(63,185,80,.15);color:#3fb950}
+.tag-dn{background:rgba(248,81,73,.15);color:#f85149}
+.tag-eq{background:rgba(110,118,129,.15);color:#8b949e}
+.sec-full{padding:10px 20px 0}
+.cc-full{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:13px;margin-bottom:9px}
+.cw-top{position:relative;height:188px}
+.cw-mid{position:relative;height:248px}
+.cgrid-bot{padding:9px 20px 14px}
+.up-bar-leg{display:none;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#f0c050;margin-top:8px}
+.up-bar-leg.show{display:flex}
+.up-bar-leg-dot{width:12px;height:8px;border-radius:2px;background:#f0c050;box-shadow:0 0 8px 3px rgba(240,184,0,.7);flex-shrink:0}
+.cb{color:#58a6ff}.cg2{color:#3fb950}.cr{color:#f85149}.cw2{color:#e6edf3}.cy{color:#d29922}.cgr{color:#8b949e}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>&#128202; AJW &#48516;&#44592; &#54924;&#51032; &#45824;&#49884;&#48372;&#46300;</h1>
+    <div class="sub">${YEAR}년 3분기 · 단위: 원 · 2025 실적 = 세금계산서 발행 기준</div>
+  </div>
+  <div class="hright">
+    <div><div class="crumb" id="crumb">전체 브랜드</div><div class="hdate">기준일: ${today}</div></div>
+    <button class="upbtn" id="upBtn" onclick="toggleUp()">
+      <span class="updot"></span>&#49464;&#44552;&#44228;&#49328;&#49436; &#48120;&#48156;&#54665; &#54252;&#54632;
+    </button>
+  </div>
+</header>
+<div class="kpi-row" id="kpiRow"></div>
+<div class="filters">
+  <div class="frow"><span class="flbl">&#51228;&#54408;&#44392;</span><div class="pills" id="bPills"></div></div>
+  <div class="frow" id="cRow" style="display:none"><span class="flbl">&#50629;&#52404;</span><div class="pills" id="cPills"></div></div>
+</div>
+<div class="sec-full">
+  <div class="cc-full" id="cc6">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#56d364"></div><span id="t6">&#51204;&#52404; &#50696;&#49328; &#44396;&#49457; &#48320;&#54868;</span></div></div>
+    <div class="cw-top"><canvas id="c6"></canvas></div>
+    <div class="leg" id="leg6"></div>
+  </div>
+</div>
+<div class="cgrid">
+  <div class="cc" id="cc1">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#388bfd"></div><span id="t1">&#48652;&#47353;&#46300;&#48324; &#49892;&#51201; &#48708;&#44368;</span></div></div>
+    <div class="cw"><canvas id="c1"></canvas></div>
+    <div class="up-bar-leg" id="ul1"><div class="up-bar-leg-dot"></div>&#9651; &#48120;&#48156;&#54665;&#48516; (&#44552;&#49353; = &#49464;&#44552;&#44228;&#49328;&#49436; &#48120;&#48156;&#54665;)</div>
+    <div class="leg">
+      <div class="li"><div class="ld" style="background:#6e7681"></div>2025&#49892;&#51201;</div>
+      <div class="li"><div class="ld" style="background:rgba(56,139,253,.5)"></div>&#50672;&#44036;&#50696;&#49328;</div>
+      <div class="li"><div class="ld" style="background:#3fb950"></div>&#48156;&#54665;&#49892;&#51201;</div>
+      <div class="li"><div class="ld" style="background:#f85149"></div>&#48156;&#54665;(&#48512;&#51652;)</div>
+      <div class="li" id="upLeg1" style="display:none"><div class="ld" style="background:#f0c050;box-shadow:0 0 5px #f0b800"></div>&#48120;&#48156;&#54665;</div>
+    </div>
+  </div>
+  <div class="cc" id="cc2">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#da3633"></div><span id="t2">&#45813;&#49457;&#47960; &#48708;&#44368;</span></div></div>
+    <div class="cw"><canvas id="c2"></canvas></div>
+    <div class="leg"><div class="li"><div class="ld" style="background:#388bfd"></div>&#50672;&#44036;</div><div class="li"><div class="ld" style="background:#d29922"></div>2Q</div><div class="li"><div class="ld" style="background:#3fb950"></div>3Q</div></div>
+  </div>
+  <div class="cc" id="cc3">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#a371f7"></div><span id="t3">&#48516;&#44592;&#48324; &#50696;&#49328; &#48320;&#54868;</span></div></div>
+    <div class="cw"><canvas id="c3"></canvas></div>
+    <div class="leg"><div class="li"><div class="ld" style="background:#388bfd"></div>&#50672;&#44036;</div><div class="li"><div class="ld" style="background:#d29922"></div>2Q</div><div class="li"><div class="ld" style="background:#a371f7"></div>3Q</div></div>
+  </div>
+  <div class="cc" id="cc4">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#58a6ff"></div><span id="t4">&#50629;&#52404;&#48324; &#49345;&#49464;</span></div></div>
+    <div class="tscroll" id="tbox"></div>
+  </div>
+</div>
+<div class="cgrid-bot">
+  <div class="cc-full" id="cc5" style="margin-top:9px">
+    <div class="ctitle"><div class="ctitle-left"><div class="dot" style="background:#388bfd"></div><span id="t5">&#48516;&#44592;&#48324; &#50696;&#49328; &#48320;&#54868; &#47589;&#45824;</span></div><span style="font-size:10px;color:#6e7681">&#9650;&#9660; = &#50672;&#44036;&#50696;&#49328; &#45824;&#48708;</span></div>
+    <div class="cw-mid"><canvas id="c5"></canvas></div>
+    <div class="leg"><div class="li"><div class="ld" style="background:rgba(56,139,253,.75)"></div>&#50672;&#44036;</div><div class="li"><div class="ld" style="background:rgba(210,153,34,.75)"></div>2Q</div><div class="li"><div class="ld" style="background:rgba(163,113,247,.75)"></div>3Q</div></div>
+  </div>
+</div>
+<script>
+${dataJs}
+let selB='ALL',selC='ALL',showUp=false;
+let ch1,ch2,ch3,ch5,ch6;
+const UC='rgba(240,184,0,0.92)';
+const fmt=v=>v==null?'-':Number(v).toLocaleString('ko-KR')+'원';
+const pct=r=>r==null?'N/A':(r*100).toFixed(1)+'%';
+const rCls=r=>r==null?'cgr':r>=1?'cb':r>=.5?'cg2':'cr';
+const isBad=br=>BD[br].b>0&&BD[br].r26/BD[br].b<.5;
+const upAmt=br=>showUp?UNPAID[br]||0:0;
+const r26Br=br=>BD[br].r26+upAmt(br);
+
+function triggerGlow(){
+  ['cc1','cc2','cc4','cc6'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.classList.remove('cg');void el.offsetWidth;el.classList.add('cg');
+    el.addEventListener('animationend',()=>el.classList.remove('cg'),{once:true});
+  });
+  document.querySelectorAll('.kval').forEach(el=>{
+    el.classList.remove('vp');void el.offsetWidth;el.classList.add('vp');
+    el.addEventListener('animationend',()=>el.classList.remove('vp'),{once:true});
+  });
+  document.querySelectorAll('.kpi').forEach(el=>{
+    el.classList.remove('kg');void el.offsetWidth;el.classList.add('kg');
+    el.addEventListener('animationend',()=>el.classList.remove('kg'),{once:true});
+  });
+}
+function toggleUp(){
+  showUp=!showUp;
+  document.getElementById('upBtn').classList.toggle('on',showUp);
+  document.getElementById('ul1').classList.toggle('show',showUp);
+  document.getElementById('upLeg1').style.display=showUp?'flex':'none';
+  buildBPills();updateAll();
+  if(showUp)triggerGlow();
+}
+const BW={categoryPercentage:.42,barPercentage:.75,maxBarThickness:26};
+const pctPlugin={id:'pct',afterDatasetsDraw(chart){
+  const{ctx,data}=chart;
+  [1,2].forEach(di=>{
+    const meta=chart.getDatasetMeta(di);if(!meta||meta.hidden)return;
+    meta.data.forEach((bar,i)=>{
+      const base=data.datasets[0].data[i]||0,val=data.datasets[di].data[i]||0;
+      if(!base||!val)return;
+      const p=(val-base)/base*100;
+      ctx.save();ctx.font='bold 8px sans-serif';
+      ctx.fillStyle=p>=0?'#3fb950':'#f85149';
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText((p>=0?'+':'')+p.toFixed(0)+'%',bar.x,bar.y-2);ctx.restore();
+    });
+  });
+}};
+const stkPlugin={id:'stk',afterDatasetsDraw(chart){
+  const{ctx,data}=chart;if(!data.datasets.length)return;
+  const n=data.datasets.length;
+  const tots=data.datasets[0].data.map((_,i)=>data.datasets.reduce((s,ds)=>s+(ds.data[i]||0),0));
+  const base=tots[0]||1;
+  chart.getDatasetMeta(n-1).data.forEach((bar,i)=>{
+    if(!tots[i])return;
+    const vt=(tots[i]/10000).toLocaleString('ko-KR')+'만';
+    const p=(tots[i]-base)/base*100;
+    const pt=i===0?'':(p>=0?'+':'')+p.toFixed(1)+'%';
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='bottom';
+    if(pt){ctx.font='bold 10px sans-serif';ctx.fillStyle=p>=0?'#3fb950':'#f85149';ctx.fillText(pt,bar.x,bar.y-14);}
+    ctx.font='bold 10px sans-serif';ctx.fillStyle='#e6edf3';ctx.fillText(vt,bar.x,bar.y-2);ctx.restore();
+  });
+}};
+const glowPlugin={id:'glow',beforeDatasetsDraw(chart,args){
+  if(!showUp||args.index<3)return;
+  const{ctx}=chart;const meta=chart.getDatasetMeta(args.index);
+  ctx.save();ctx.shadowColor='rgba(240,184,0,.85)';ctx.shadowBlur=16;
+  meta.data.forEach(b=>{if(b.height&&b.height>0){ctx.fillStyle=UC;ctx.fillRect(b.x-b.width/2,b.y,b.width,b.height);}});
+  ctx.restore();
+}};
+const CC=['rgba(56,139,253,.75)','rgba(63,185,80,.75)','rgba(210,153,34,.75)','rgba(163,113,247,.75)','rgba(86,211,100,.75)','rgba(121,192,255,.75)','rgba(248,81,73,.75)','rgba(255,166,87,.75)'];
+const BC={};BRANDS.forEach(function(b,i){BC[b]=CC[i%CC.length];});
+const TTP=cb=>({backgroundColor:'#1c2128',borderColor:'#30363d',borderWidth:1,titleColor:'#8b949e',bodyColor:'#e6edf3',padding:10,callbacks:{label:cb}});
+const SXY={x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}},y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>v===0?'0':(v/10000).toLocaleString('ko-KR')+'만'},grid:{color:'rgba(48,54,61,.4)'}}};
+const BASE={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}};
+
+function init(){
+  buildBPills();
+  ch6=new Chart(document.getElementById('c6'),{type:'bar',
+    data:{labels:['연간예산','2분기예산','3분기예산'],datasets:[]},
+    options:{...BASE,layout:{padding:{top:36}},
+      scales:{x:{ticks:{color:'#8b949e',font:{size:11}},grid:{color:'rgba(48,54,61,.4)'},stacked:true},y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>v===0?'0':(v/10000).toLocaleString('ko-KR')+'만'},grid:{color:'rgba(48,54,61,.4)'},stacked:true}},
+      plugins:{...BASE.plugins,tooltip:{backgroundColor:'#1c2128',borderColor:'#30363d',borderWidth:1,titleColor:'#8b949e',bodyColor:'#e6edf3',padding:10,callbacks:{label:ctx=>' '+ctx.dataset.label+': '+fmt(ctx.parsed.y)}}}},
+    plugins:[stkPlugin]});
+  ch1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:[],datasets:[]},
+    options:{...BASE,scales:SXY,plugins:{...BASE.plugins,tooltip:{...TTP(ctx=>' '+ctx.dataset.label+': '+fmt(ctx.parsed.y)),filter:item=>item.parsed.y>0}}},
+    plugins:[glowPlugin]});
+  ch2=new Chart(document.getElementById('c2'),{type:'bar',data:{labels:[],datasets:[]},options:{...BASE,indexAxis:'y',scales:{x:{ticks:{color:'#8b949e',font:{size:10},callback:v=>(v*100).toFixed(0)+'%'},grid:{color:'rgba(48,54,61,.5)'},min:0,max:1.1},y:{ticks:{color:'#8b949e',font:{size:10}},grid:{display:false}}},plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#8b949e',font:{size:10},boxWidth:8,padding:8}},tooltip:TTP(ctx=>' '+ctx.dataset.label+': '+pct(ctx.raw))}}});
+  ch3=new Chart(document.getElementById('c3'),{type:'bar',data:{labels:[],datasets:[]},options:{...BASE,scales:SXY,plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#8b949e',font:{size:10},boxWidth:8,padding:8}},tooltip:TTP(ctx=>' '+ctx.dataset.label+': '+fmt(ctx.parsed.y))}}});
+  ch5=new Chart(document.getElementById('c5'),{type:'bar',data:{labels:[],datasets:[]},options:{...BASE,layout:{padding:{top:22}},scales:SXY,plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#8b949e',font:{size:10},boxWidth:8,padding:8}},tooltip:TTP(ctx=>' '+ctx.dataset.label+': '+fmt(ctx.parsed.y))}},plugins:[pctPlugin]});
+  updateAll();
+}
+
+function buildBPills(){
+  const el=document.getElementById('bPills');el.innerHTML='';
+  const add=(lbl,val,cls='')=>{const b=document.createElement('button');b.className='pill'+(cls?' '+cls:'')+(selB===val?' active':'');b.innerHTML=lbl;b.onclick=()=>{selB=val;selC='ALL';buildBPills();updateAll();};el.appendChild(b);};
+  add('전체','ALL');
+  BRANDS.forEach(br=>{
+    const v=r26Br(br),bgt=BD[br].b,r=bgt>0?v/bgt:null;
+    const rl=r==null?'<span class="badge bn">N/A</span>':r<.5?'<span class="badge br">'+(r*100).toFixed(0)+'%</span>':'<span class="badge bg">'+(r*100).toFixed(0)+'%</span>';
+    add(br+' '+rl,br,isBad(br)?'bad':'');
+  });
+}
+function buildCPills(comps){
+  const row=document.getElementById('cRow'),el=document.getElementById('cPills');
+  if(selB==='ALL'){row.style.display='none';return;}
+  row.style.display='flex';el.innerHTML='';
+  ['ALL',...comps.map(c=>c.name)].forEach((n,i)=>{
+    const b=document.createElement('button');
+    b.className='pill'+(selC===n?' active':'');b.textContent=i===0?'전체':n;
+    b.onclick=()=>{selC=n;buildCPills(comps);updateAll();};el.appendChild(b);
+  });
+}
+function updateAll(){
+  const comps=selB==='ALL'?COMPS:COMPS.filter(c=>c.brand===selB);
+  buildCPills(comps);
+  const data=selC==='ALL'?comps:comps.filter(c=>c.name===selC);
+  updateKPI(data);updateC6(data);updateC1(data);updateC2(data);updateC3(data);updateC5(data);updateTable(data);
+  document.getElementById('crumb').textContent=selB==='ALL'?'전체 브랜드':selB+(selC!=='ALL'?' > '+selC:'');
+}
+function updateKPI(data){
+  let r25,b,q2b,q3b,r26base,upTotal;
+  if(selB==='ALL'&&selC==='ALL'){
+    r25=TOTAL.r25;b=TOTAL.b;q2b=TOTAL.q2b;q3b=TOTAL.q3b;
+    r26base=TOTAL.r26;
+    upTotal=showUp?UNPAID_TOTAL:0;
+  } else if(selB!=='ALL'&&selC==='ALL'){
+    r25=BD[selB].r25;b=BD[selB].b;q2b=BD[selB].q2b;q3b=BD[selB].q3b;
+    r26base=BD[selB].r26;
+    upTotal=showUp?UNPAID[selB]||0:0;
+  } else {
+    const c=data[0]||{};
+    r25=c.r25||0;b=c.b||0;q2b=c.q2b||0;q3b=c.q3b||0;r26base=c.r26||0;upTotal=0;
+  }
+  const r26eff=r26base+upTotal;
+  const rate=b>0?r26eff/b:null,q3r=q3b>0?r26eff/q3b:null;
+  const rc=r=>r==null?'#8b949e':r>=.5?'#3fb950':'#f85149';
+  const pf=r=>r==null?0:Math.min(r,1)*100;
+  const yoy=r25>0?((b-r25)/r25*100).toFixed(1):null;
+  const isUp=showUp&&upTotal>0;
+  document.getElementById('kpiRow').innerHTML=
+    '<div class="kpi" style="--ac:#58a6ff"><div class="klbl">2025 총 실적</div><div class="kval cb">'+fmt(r25)+'</div><div class="ksub">'+(yoy?'예산 YoY '+(yoy>0?'+':'')+yoy+'%':'')+'</div></div>'+
+    '<div class="kpi" style="--ac:#388bfd"><div class="klbl">2026 연간예산</div><div class="kval cw2">'+fmt(b)+'</div></div>'+
+    '<div class="kpi" style="--ac:#d29922"><div class="klbl">3분기 예산</div><div class="kval cy">'+fmt(q3b)+'</div><div class="ksub">'+(q3b&&b?'연간대비 '+((q3b-b)/b*100).toFixed(1)+'%':'미편성')+'</div></div>'+
+    '<div class="kpi" style="--ac:'+(isUp?'#f0b800':'#3fb950')+'"><div class="klbl">2026 실적'+(isUp?' <span style="color:#f0c050;font-size:9px">&#x2605;미발행포함</span>':'')+'</div><div class="kval" style="color:'+(isUp?'#f0c050':'#3fb950')+'">'+fmt(r26eff)+'</div><div class="ksub">'+(isUp?'발행 '+fmt(r26base)+' + 미발행 '+fmt(upTotal):'잔여 '+fmt(Math.max(b-r26eff,0)))+'</div></div>'+
+    '<div class="kpi" style="--ac:'+rc(rate)+'"><div class="klbl">연간 달성률</div><div class="kval" style="color:'+rc(rate)+'">'+pct(rate)+'</div><div class="pb"><div class="pbf" style="width:'+pf(rate)+'%;background:'+rc(rate)+'"></div></div></div>'+
+    '<div class="kpi" style="--ac:'+rc(q3r)+'"><div class="klbl">3분기 달성률</div><div class="kval" style="color:'+rc(q3r)+'">'+pct(q3r)+'</div><div class="pb"><div class="pbf" style="width:'+pf(q3r)+'%;background:'+rc(q3r)+'"></div></div></div>';
+}
+function updateC6(data){
+  let ds,title;
+  if(selB==='ALL'){ds=BRANDS.map(b=>({label:b,data:[BD[b].b||0,BD[b].q2b||0,BD[b].q3b||0],backgroundColor:BC[b],borderRadius:3,stack:'s',maxBarThickness:55}));title='전체 예산 구성 변화 (브랜드별)';}
+  else{const it=data.filter(c=>c.b>0||c.q2b>0||c.q3b>0);ds=it.map((c,i)=>({label:c.name,data:[c.b||0,c.q2b||0,c.q3b||0],backgroundColor:CC[i%CC.length],borderRadius:3,stack:'s',maxBarThickness:55}));title=selB+' 예산 구성 변화';}
+  document.getElementById('t6').textContent=title;ch6.data.datasets=ds;ch6.update();
+  document.getElementById('leg6').innerHTML=ds.map(d=>'<div class="li"><div class="ld" style="background:'+d.backgroundColor+'"></div>'+d.label+'</div>').join('');
+}
+function updateC1(data){
+  let labels,d25,dB,dR,dU,colors;
+  const colorOf=(r26,b)=>{const r=b>0?r26/b:null;return r==null?'rgba(110,118,129,.6)':r>=.5?'rgba(63,185,80,.75)':'rgba(248,81,73,.75)';};
+  if(selB==='ALL'){
+    labels=BRANDS;d25=BRANDS.map(b=>BD[b].r25);dB=BRANDS.map(b=>BD[b].b);
+    dR=BRANDS.map(b=>BD[b].r26);
+    dU=BRANDS.map(b=>showUp?UNPAID[b]||0:0);
+    colors=BRANDS.map(b=>colorOf(BD[b].r26,BD[b].b));
+    document.getElementById('t1').textContent='브랜드별 실적 비교';
+  } else {
+    labels=data.map(c=>c.name);d25=data.map(c=>c.r25);dB=data.map(c=>c.b);
+    dR=data.map(c=>c.r26);dU=data.map(()=>0);
+    colors=data.map(c=>colorOf(c.r26,c.b));
+    document.getElementById('t1').textContent=selB+' 업체별 실적';
+  }
+  ch1.data.labels=labels;
+  ch1.data.datasets=[
+    {label:'2025 실적',data:d25,backgroundColor:'rgba(110,118,129,.55)',borderRadius:3,...BW},
+    {label:'2026 연간예산',data:dB,backgroundColor:'rgba(56,139,253,.45)',borderRadius:3,...BW},
+    {label:'발행 실적',data:dR,backgroundColor:colors,borderRadius:[3,3,0,0],stack:'act',...BW},
+    {label:'미발행',data:dU,backgroundColor:UC,borderRadius:[3,3,0,0],stack:'act',borderWidth:0,...BW}
+  ];ch1.update();
+}
+function updateC2(data){
+  let items;
+  if(selB==='ALL'){
+    items=BRANDS.map(b=>{const v=r26Br(b),bgt=BD[b].b;return{name:b,rate:bgt>0?v/bgt:null,q2r:BD[b].q2b>0?v/BD[b].q2b:null,q3r:BD[b].q3b>0?v/BD[b].q3b:null};});
+    document.getElementById('t2').textContent='브랜드별 달성률 비교';
+  } else {
+    items=data.filter(c=>c.b>0||c.r26>0).map(c=>{const v=c.r26;return{name:c.name,rate:c.b>0?v/c.b:null,q2r:c.q2b>0?v/c.q2b:null,q3r:c.q3b>0?v/c.q3b:null};});
+    document.getElementById('t2').textContent=selB+' 업체별 달성률';
+  }
+  items.sort((a,b)=>(b.rate!=null?b.rate:-1)-(a.rate!=null?a.rate:-1));
+  const allR=[...items.map(i=>i.rate||0),...items.map(i=>i.q2r||0),...items.map(i=>i.q3r||0)];
+  const ax=Math.min(Math.max(Math.max(...allR)*1.1,.15),2.5);
+  const cap=r=>r==null?0:Math.min(r,ax);
+  const rr={a:items.map(i=>i.rate),q:items.map(i=>i.q2r),q3:items.map(i=>i.q3r)};
+  document.getElementById('c2').parentElement.style.height=Math.max(180,items.length*38)+'px';
+  ch2.data.labels=items.map(i=>i.name);
+  ch2.data.datasets=[
+    {label:'연간',data:items.map(i=>cap(i.rate)),backgroundColor:'rgba(56,139,253,.75)',categoryPercentage:.4,barPercentage:.75,borderRadius:3},
+    {label:'2Q',  data:items.map(i=>cap(i.q2r)), backgroundColor:'rgba(210,153,34,.75)',categoryPercentage:.4,barPercentage:.75,borderRadius:3},
+    {label:'3Q',  data:items.map(i=>cap(i.q3r)), backgroundColor:'rgba(63,185,80,.75)', categoryPercentage:.4,barPercentage:.75,borderRadius:3}
+  ];
+  ch2.options.scales.x.max=ax;
+  ch2.options.plugins.tooltip.callbacks.label=ctx=>{const k=['a','q','q3'][ctx.datasetIndex];return' '+ctx.dataset.label+': '+pct(rr[k][ctx.dataIndex]);};
+  ch2.update();
+}
+function updateC3(data){
+  let labels,dB,dQ2,dQ3;
+  if(selB==='ALL'){labels=BRANDS;dB=BRANDS.map(b=>BD[b].b);dQ2=BRANDS.map(b=>BD[b].q2b);dQ3=BRANDS.map(b=>BD[b].q3b);document.getElementById('t3').textContent='브랜드별 예산 변화';}
+  else{labels=data.map(c=>c.name);dB=data.map(c=>c.b);dQ2=data.map(c=>c.q2b);dQ3=data.map(c=>c.q3b);document.getElementById('t3').textContent=selB+' 예산 변화';}
+  ch3.data.labels=labels;
+  ch3.data.datasets=[
+    {label:'연간',data:dB, backgroundColor:'rgba(56,139,253,.55)',borderRadius:3,...BW},
+    {label:'2Q', data:dQ2,backgroundColor:'rgba(210,153,34,.55)',borderRadius:3,...BW},
+    {label:'3Q', data:dQ3,backgroundColor:'rgba(163,113,247,.55)',borderRadius:3,...BW}
+  ];ch3.update();
+}
+function updateC5(data){
+  let labels,dB,dQ2,dQ3,title;
+  if(selB==='ALL'){labels=BRANDS;dB=BRANDS.map(b=>BD[b].b);dQ2=BRANDS.map(b=>BD[b].q2b);dQ3=BRANDS.map(b=>BD[b].q3b);title='브랜드별 분기 예산 변화';}
+  else{const it=data.filter(c=>c.b>0||c.q2b>0||c.q3b>0);labels=it.map(c=>c.name);dB=it.map(c=>c.b||0);dQ2=it.map(c=>c.q2b||0);dQ3=it.map(c=>c.q3b||0);title=selB+' 분기 예산 변화';}
+  document.getElementById('t5').textContent=title;
+  ch5.data.labels=labels;
+  ch5.data.datasets=[
+    {label:'연간',data:dB, backgroundColor:'rgba(56,139,253,.75)',borderRadius:3,...BW},
+    {label:'2Q', data:dQ2,backgroundColor:'rgba(210,153,34,.75)',borderRadius:3,...BW},
+    {label:'3Q', data:dQ3,backgroundColor:'rgba(163,113,247,.75)',borderRadius:3,...BW}
+  ];ch5.update();
+}
+function bTag(b,q){if(!b||!q)return'<span class="tag tag-eq">-</span>';const d=((q-b)/b*100).toFixed(0);if(Math.abs(d)<1)return'<span class="tag tag-eq">0%</span>';return d>0?'<span class="tag tag-up">+'+d+'%</span>':'<span class="tag tag-dn">'+d+'%</span>';}
+function updateTable(data){
+  let rows;
+  if(selB==='ALL'){
+    rows=BRANDS.map(b=>{const v=r26Br(b),bgt=BD[b].b;return{n:b,b:bgt,q2b:BD[b].q2b,q3b:BD[b].q3b,r26:v,rate:bgt>0?v/bgt:null,q2r:BD[b].q2b>0?v/BD[b].q2b:null,q3r:BD[b].q3b>0?v/BD[b].q3b:null};});
+    document.getElementById('t4').textContent='브랜드별 요약';
+  } else {
+    rows=data.map(c=>{const v=c.r26,bgt=c.b;return{n:c.name,b:bgt,q2b:c.q2b,q3b:c.q3b,r26:v,rate:bgt>0?v/bgt:null,q2r:c.q2b>0?v/c.q2b:null,q3r:c.q3b>0?v/c.q3b:null};});
+    document.getElementById('t4').textContent=selB+' 업체 상세';
+  }
+  let h='<table class="tbl"><thead><tr><th>이름</th><th class="n">연간예산</th><th class="n">2Q</th><th></th><th class="n">3Q</th><th></th><th class="n">실적</th><th class="rc">연간%</th><th class="rc">2Q%</th><th class="rc">3Q%</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const lo=r.rate!==null&&r.rate<.5;
+    h+='<tr class="'+(lo?'br-row':'')+'"><td class="nm" title="'+r.n+'">'+r.n+'</td><td class="n">'+fmt(r.b)+'</td><td class="n">'+fmt(r.q2b)+'</td><td>'+bTag(r.b,r.q2b)+'</td><td class="n">'+fmt(r.q3b)+'</td><td>'+bTag(r.b,r.q3b)+'</td><td class="nw">'+fmt(r.r26)+'</td><td class="rc '+rCls(r.rate)+'">'+pct(r.rate)+'</td><td class="rc '+rCls(r.q2r)+'">'+pct(r.q2r)+'</td><td class="rc '+rCls(r.q3r)+'">'+pct(r.q3r)+'</td></tr>';
+  });
+  h+='</tbody></table>';document.getElementById('tbox').innerHTML=h;
+}
+window.addEventListener('DOMContentLoaded',init);
+</script></body></html>
+`;
 }

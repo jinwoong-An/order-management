@@ -313,7 +313,7 @@ const API = {
 
   "POST /api/submission": async (req, res) => {
     const body = await readBody(req);
-    const html = await buildSubmissionHtml(body.title);
+    const html = await buildSubmissionHtml(body.title, body.type);
     sendJson(res, 200, { ok: true, html });
   },
 };
