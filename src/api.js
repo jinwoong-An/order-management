@@ -11,9 +11,20 @@ import {
 } from "./db.js";
 import { createBackup, listBackups, restoreBackup, pruneAutoBackups } from "./backup.js";
 import { buildSubmissionHtml } from "./submission-html.js";
+import { SEED } from "./seed-data.js";
 
 export const APP_ID = "order-management-clean-distribution";
 export const APP_VERSION = "64.0.0";
+
+// itemBudgets는 클라우드(Supabase)에서 자동 시드가 안 되므로, 비어 있으면 최초 1회 엑셀 시드를 채운다.
+async function readItemBudgetsSeeded() {
+  let rows = await readCollection("itemBudgets");
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const seed = SEED.itemBudgets || [];
+    if (seed.length) { await writeCollection("itemBudgets", seed); return seed; }
+  }
+  return rows;
+}
 const APP_PASSWORD = process.env.APP_PASSWORD || "";
 
 let inited = false;
@@ -81,13 +92,13 @@ const API = {
         readCollection("orders"), readCollection("annualMetrics"), readCollection("planValues"),
         readCollection("recurringForecasts"), readCollection("forecasts"), readCollection("monthlyPlans"),
         readCollection("yearlyAnalysis"), readCollection("customerPlans"), readCollection("events"), readCollection("todos"),
-        readCollection("itemBudgets"),
+        readItemBudgetsSeeded(),
       ]);
     sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos, itemBudgets });
   },
 
   // ---- ITEM별 BUDGET & 실적 (분기별) ----
-  "GET /api/item-budgets": async (_req, res) => sendJson(res, 200, await readCollection("itemBudgets")),
+  "GET /api/item-budgets": async (_req, res) => sendJson(res, 200, await readItemBudgetsSeeded()),
   "PUT /api/item-budgets": async (req, res) => {
     const body = await readBody(req);
     const rows = Array.isArray(body) ? body : [];
