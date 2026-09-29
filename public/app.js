@@ -641,33 +641,86 @@ function openBucketDialog(key) {
 }
 
 /* ---- ITEM별 BUDGET & 실적 (분기별) 편집 그리드 ---- */
-const IB_FIELDS = [
+// 편집 가능한 예산 열 (TOTAL은 발주 실적에서 자동 계산 → 읽기전용)
+const IB_EDIT_FIELDS = [
   { key: "result", label: "2025 실적" },
   { key: "budget", label: "2026 예산" },
   { key: "q2", label: "2분기 예산" },
   { key: "q3", label: "3분기 예산" },
   { key: "q4", label: "4분기 예산" },
-  { key: "total", label: "2026 TOTAL" },
 ];
 function ibNewId(prefix) { return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`; }
 function ibCellVal(v) { return (v === null || v === undefined || v === "") ? "" : won(v); }
-function ibSectionTotals(sec) {
-  const t = {};
-  for (const f of IB_FIELDS) t[f.key] = (sec.customers || []).reduce((s, c) => s + parseNum(c[f.key]), 0);
-  return t;
+// 업체명 정규화(끝의 마침표/공백 제거, 소문자) — ETC 및 업체 매칭용
+function ibNorm(s) { return String(s || "").trim().replace(/[.．\s]+$/g, "").replace(/\s+/g, " ").toLowerCase(); }
+// 발주 실적: 세금계산서 발행(처리 완료) 건을 ITEM명 → 업체명 → 금액 으로 집계
+function ibActualsByItem(year) {
+  const map = new Map(); // itemNameUpper -> Map(custNorm -> {name, amount})
+  for (const o of store.orders) {
+    if (yearOf(o.invoiceDate) !== year) continue; // 처리 완료(계산서 발행)만
+    const cust = (o.customer || "").trim() || "미지정";
+    const items = (o.items && o.items.length) ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
+    for (const it of items) {
+      const code = ITEM_CODES.includes(it.item) ? it.item : "ETC";
+      const itemName = (ITEM_NAME[code] || code).toUpperCase();
+      if (!map.has(itemName)) map.set(itemName, new Map());
+      const m = map.get(itemName);
+      const k = ibNorm(cust);
+      if (!m.has(k)) m.set(k, { name: cust, amount: 0 });
+      m.get(k).amount += parseNum(it.amount);
+    }
+  }
+  return map;
+}
+// 섹션별 실적 계산 → { totalsById:{custId:amount}, etcExtra:number(ETC행 없을 때 남는 금액), colTotal:number }
+const IB_TOTALS = {}; // custId -> 계산된 TOTAL (저장 시 사용)
+function ibComputeSection(sec, actualsMap) {
+  const secActuals = actualsMap.get((sec.item || "").trim().toUpperCase()) || new Map();
+  const custs = sec.customers || [];
+  const etcIdx = custs.findIndex((c) => ibNorm(c.name) === "etc");
+  const matched = new Set();
+  const totalsById = {};
+  custs.forEach((c, i) => {
+    if (i === etcIdx) return;
+    const k = ibNorm(c.name);
+    if (k && secActuals.has(k)) { totalsById[c.id] = secActuals.get(k).amount; matched.add(k); }
+    else totalsById[c.id] = 0;
+  });
+  let leftover = 0;
+  for (const [k, v] of secActuals) if (!matched.has(k)) leftover += v.amount;
+  let etcExtra = 0;
+  if (etcIdx >= 0) totalsById[custs[etcIdx].id] = leftover;
+  else etcExtra = leftover;
+  const colTotal = Object.values(totalsById).reduce((s, v) => s + v, 0) + etcExtra;
+  return { totalsById, etcExtra, colTotal };
 }
 function renderItemBudgets() {
   const grid = $("itemBudgetGrid");
   if (!grid) return;
   const secs = store.itemBudgets || [];
+  const actualsMap = ibActualsByItem(ui.year);
+  for (const k of Object.keys(IB_TOTALS)) delete IB_TOTALS[k];
+
   grid.innerHTML = secs.map((sec) => {
-    const t = ibSectionTotals(sec);
-    const rows = (sec.customers || []).map((c) => `
-      <tr data-ib-cust="${c.id}">
+    const comp = ibComputeSection(sec, actualsMap);
+    const editTotals = {};
+    for (const f of IB_EDIT_FIELDS) editTotals[f.key] = (sec.customers || []).reduce((s, c) => s + parseNum(c[f.key]), 0);
+
+    const rows = (sec.customers || []).map((c) => {
+      const rt = comp.totalsById[c.id] || 0;
+      IB_TOTALS[c.id] = rt;
+      return `<tr data-ib-cust="${c.id}">
         <td><input class="ib-cell-name" value="${escapeHtml(c.name || "")}" placeholder="업체명"/></td>
-        ${IB_FIELDS.map((f) => `<td class="number"><input class="ib-cell" data-ib-field="${f.key}" inputmode="numeric" value="${ibCellVal(c[f.key])}" placeholder="0"/></td>`).join("")}
+        ${IB_EDIT_FIELDS.map((f) => `<td class="number"><input class="ib-cell" data-ib-field="${f.key}" inputmode="numeric" value="${ibCellVal(c[f.key])}" placeholder="0"/></td>`).join("")}
+        <td class="number ib-total-cell" title="발주(세금계산서) 자동 집계">${rt ? won(rt) : "-"}</td>
         <td class="ib-rowdel"><button class="mini-btn danger" data-ib-del-cust title="업체 삭제">✕</button></td>
-      </tr>`).join("");
+      </tr>`;
+    }).join("");
+    // ETC 행이 없는데 미매칭 실적이 있으면 자동집계 행 표시(읽기전용)
+    const synth = comp.etcExtra > 0
+      ? `<tr class="ib-synth"><td>ETC <small>(자동집계)</small></td>${IB_EDIT_FIELDS.map(() => `<td class="number muted">-</td>`).join("")}<td class="number ib-total-cell strong">${won(comp.etcExtra)}</td><td class="ib-rowdel"></td></tr>`
+      : "";
+
     return `<div class="ib-section" data-ib-section="${sec.id}">
       <div class="ib-section-head">
         <input class="ib-item-name" value="${escapeHtml(sec.item || "")}" placeholder="ITEM 명"/>
@@ -675,9 +728,9 @@ function renderItemBudgets() {
       </div>
       <div class="table-scroll">
       <table class="data-table ib-table">
-        <thead><tr><th>업체</th>${IB_FIELDS.map((f) => `<th class="number">${f.label}</th>`).join("")}<th class="ib-rowdel"></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="8" class="muted">업체를 추가하세요.</td></tr>`}</tbody>
-        <tfoot><tr class="ib-total-row"><td>TOTAL</td>${IB_FIELDS.map((f) => `<td class="number strong" data-ib-total="${f.key}">${won(t[f.key])}</td>`).join("")}<td class="ib-rowdel"></td></tr></tfoot>
+        <thead><tr><th>업체</th>${IB_EDIT_FIELDS.map((f) => `<th class="number">${f.label}</th>`).join("")}<th class="number ib-total-head">2026 TOTAL<br><small>발주 자동집계</small></th><th class="ib-rowdel"></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8" class="muted">업체를 추가하세요.</td></tr>`}${synth}</tbody>
+        <tfoot><tr class="ib-total-row"><td>TOTAL</td>${IB_EDIT_FIELDS.map((f) => `<td class="number strong" data-ib-foot="${f.key}">${won(editTotals[f.key])}</td>`).join("")}<td class="number strong">${won(comp.colTotal)}</td><td class="ib-rowdel"></td></tr></tfoot>
       </table>
       </div>
       <button class="button subtle small ib-add-cust" data-ib-add-cust type="button">+ 업체 추가</button>
@@ -685,7 +738,7 @@ function renderItemBudgets() {
   }).join("") || `<p class="muted">아래 'ITEM 추가'로 시작하세요.</p>`;
 
   // 전체 2026 예산 합계 배지
-  const grand = secs.reduce((s, sec) => s + ibSectionTotals(sec).budget, 0);
+  const grand = secs.reduce((s, sec) => s + (sec.customers || []).reduce((a, c) => a + parseNum(c.budget), 0), 0);
   $("itemBudgetGrandBadge").textContent = `2026 예산 합계 ${won(grand)}`;
 }
 // DOM → store 로 현재 그리드 상태 수집(구조 변경 전 미저장 편집 보존)
@@ -696,11 +749,13 @@ function collectItemBudgets() {
     const item = secEl.querySelector(".ib-item-name").value.trim();
     const customers = [];
     secEl.querySelectorAll("tr[data-ib-cust]").forEach((tr) => {
-      const cust = { id: tr.dataset.ibCust, name: tr.querySelector(".ib-cell-name").value.trim() };
+      const cid = tr.dataset.ibCust;
+      const cust = { id: cid, name: tr.querySelector(".ib-cell-name").value.trim() };
       tr.querySelectorAll(".ib-cell").forEach((inp) => {
         const raw = inp.value.trim();
         cust[inp.dataset.ibField] = raw === "" ? null : parseNum(raw);
       });
+      cust.total = IB_TOTALS[cid] || 0; // 발주 자동집계 값 보존
       customers.push(cust);
     });
     secs.push({ id, item, customers });
@@ -713,11 +768,11 @@ async function saveItemBudgets() {
 }
 function recalcIbSection(secEl) {
   const t = {};
-  for (const f of IB_FIELDS) t[f.key] = 0;
+  for (const f of IB_EDIT_FIELDS) t[f.key] = 0;
   secEl.querySelectorAll("tr[data-ib-cust]").forEach((tr) => {
     tr.querySelectorAll(".ib-cell").forEach((inp) => { t[inp.dataset.ibField] += parseNum(inp.value); });
   });
-  secEl.querySelectorAll("[data-ib-total]").forEach((td) => { td.textContent = won(t[td.dataset.ibTotal]); });
+  secEl.querySelectorAll("[data-ib-foot]").forEach((td) => { td.textContent = won(t[td.dataset.ibFoot]); });
   const grand = $$("#itemBudgetGrid .ib-section").reduce((s, el) => {
     let b = 0; el.querySelectorAll('.ib-cell[data-ib-field="budget"]').forEach((i) => { b += parseNum(i.value); }); return s + b;
   }, 0);
