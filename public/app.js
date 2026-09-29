@@ -102,6 +102,7 @@ const store = {
   yearlyAnalysis: [],
   events: [],
   todos: [],
+  itemBudgets: [],
 };
 
 const ui = {
@@ -167,6 +168,7 @@ async function refreshAll() {
     yearlyAnalysis: d.yearlyAnalysis || [],
     events: d.events || [],
     todos: d.todos || [],
+    itemBudgets: d.itemBudgets || [],
   });
   ensureRecurringDefaults();
 }
@@ -592,8 +594,7 @@ function renderPerformance() {
   $("itemReconcileBadge").className = `reconcile-badge ${itemMatch ? "ok" : "warn"}`;
 
   renderAmountBuckets(year);
-  renderPlanItemFilters();
-  renderFuturePlan(year);
+  renderItemBudgets();
   renderYearlyAnalysis();
 }
 
@@ -639,74 +640,118 @@ function openBucketDialog(key) {
   $("bucketDialog").showModal();
 }
 
-function renderPlanItemFilters() {
-  $("planItemFilters").innerHTML = ITEM_CODES.map((c) =>
-    `<button class="plan-item-chip item-${c} ${ui.planItem === c ? "active" : ""}" data-plan-item="${c}">
-      <b>${c}</b><span>${ITEM_NAME[c]}</span></button>`).join("");
+/* ---- ITEM별 BUDGET & 실적 (분기별) 편집 그리드 ---- */
+const IB_FIELDS = [
+  { key: "result", label: "2025 실적" },
+  { key: "budget", label: "2026 예산" },
+  { key: "q2", label: "2분기 예산" },
+  { key: "q3", label: "3분기 예산" },
+  { key: "q4", label: "4분기 예산" },
+  { key: "total", label: "2026 TOTAL" },
+];
+function ibNewId(prefix) { return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`; }
+function ibCellVal(v) { return (v === null || v === undefined || v === "") ? "" : won(v); }
+function ibSectionTotals(sec) {
+  const t = {};
+  for (const f of IB_FIELDS) t[f.key] = (sec.customers || []).reduce((s, c) => s + parseNum(c[f.key]), 0);
+  return t;
 }
+function renderItemBudgets() {
+  const grid = $("itemBudgetGrid");
+  if (!grid) return;
+  const secs = store.itemBudgets || [];
+  grid.innerHTML = secs.map((sec) => {
+    const t = ibSectionTotals(sec);
+    const rows = (sec.customers || []).map((c) => `
+      <tr data-ib-cust="${c.id}">
+        <td><input class="ib-cell-name" value="${escapeHtml(c.name || "")}" placeholder="업체명"/></td>
+        ${IB_FIELDS.map((f) => `<td class="number"><input class="ib-cell" data-ib-field="${f.key}" inputmode="numeric" value="${ibCellVal(c[f.key])}" placeholder="0"/></td>`).join("")}
+        <td class="ib-rowdel"><button class="mini-btn danger" data-ib-del-cust title="업체 삭제">✕</button></td>
+      </tr>`).join("");
+    return `<div class="ib-section" data-ib-section="${sec.id}">
+      <div class="ib-section-head">
+        <input class="ib-item-name" value="${escapeHtml(sec.item || "")}" placeholder="ITEM 명"/>
+        <button class="mini-btn danger" data-ib-del-item title="ITEM 삭제">ITEM 삭제 ✕</button>
+      </div>
+      <div class="table-scroll">
+      <table class="data-table ib-table">
+        <thead><tr><th>업체</th>${IB_FIELDS.map((f) => `<th class="number">${f.label}</th>`).join("")}<th class="ib-rowdel"></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8" class="muted">업체를 추가하세요.</td></tr>`}</tbody>
+        <tfoot><tr class="ib-total-row"><td>TOTAL</td>${IB_FIELDS.map((f) => `<td class="number strong" data-ib-total="${f.key}">${won(t[f.key])}</td>`).join("")}<td class="ib-rowdel"></td></tr></tfoot>
+      </table>
+      </div>
+      <button class="button subtle small ib-add-cust" data-ib-add-cust type="button">+ 업체 추가</button>
+    </div>`;
+  }).join("") || `<p class="muted">아래 'ITEM 추가'로 시작하세요.</p>`;
 
-function renderFuturePlan(year) {
-  const code = ui.planItem;
-  const label = ITEM_NAME[code];
-  const rows = planValuesFor(year).filter((p) => (NAME_TO_CODE[p.item_label] || p.item_label) === code || p.item_label === label);
-  // 현재 TOTAL(거래처별, 해당 ITEM 세금계산서)
-  const custTotals = new Map();
-  for (const o of store.orders) {
-    if (yearOf(o.invoiceDate) !== year) continue;
-    const name = (o.customer || "미지정").trim();
-    const items = o.items && o.items.length ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
-    for (const it of items) {
-      const c = ITEM_CODES.includes(it.item) ? it.item : "ETC";
-      if (c !== code) continue;
-      custTotals.set(name, (custTotals.get(name) || 0) + parseNum(it.amount));
-    }
-  }
-
-  const body = $("futurePlanBody");
-  const list = rows.slice();
-  // ETC의 경우 실제 계산서 거래처도 병합 표시
-  if (code === "ETC") {
-    for (const [name] of custTotals) {
-      if (!list.some((r) => (r.customer || "") === name)) {
-        list.push({ year, item_label: "ETC", customer: name, budget: null, q2_budget: null, q3_budget: null, next_budget: null, _actual: true });
-      }
-    }
-  }
-
-  body.innerHTML = list.length
-    ? list.map((p) => {
-        const cur = custTotals.get(p.customer) || 0;
-        const q4 = parseNum(p.next_budget);
-        const last = q4 || parseNum(p.q3_budget) || parseNum(p.q2_budget) || parseNum(p.budget);
-        const rate = last ? `${Math.round((cur / last) * 1000) / 10}%` : "-";
-        return `<tr>
-          <td>${escapeHtml(p.customer || "-")}</td>
-          <td class="number">${p.budget != null ? won(p.budget) : "-"}</td>
-          <td class="number">${p.q2_budget != null ? won(p.q2_budget) : "-"}</td>
-          <td class="number">${p.q3_budget != null ? won(p.q3_budget) : "-"}</td>
-          <td class="number"><input class="plan-next-input" data-plan-customer="${escapeHtml(p.customer || "")}" data-plan-label="${escapeHtml(p.item_label)}" value="${q4 ? won(q4) : ""}" inputmode="numeric" placeholder="0"/></td>
-          <td class="number strong">${won(cur)}</td>
-          <td class="number">${rate}</td></tr>`;
-      }).join("")
-    : `<tr><td colspan="7" class="muted">${code} BUDGET 업체가 없습니다.</td></tr>`;
-
-  const totalNext = list.reduce((s, p) => s + parseNum(p.next_budget), 0);
-  $("budgetPlanReconcileBadge").textContent = totalNext ? `4분기 합계 ${won(totalNext)}` : "4분기 미입력";
-  $("budgetPlanReconcileBadge").className = "reconcile-badge ok";
+  // 전체 2026 예산 합계 배지
+  const grand = secs.reduce((s, sec) => s + ibSectionTotals(sec).budget, 0);
+  $("itemBudgetGrandBadge").textContent = `2026 예산 합계 ${won(grand)}`;
 }
-
-async function savePlanNext(customer, label, value) {
-  const year = ui.year;
-  const rows = store.planValues.slice();
-  let row = rows.find((p) => Number(p.year) === year && p.item_label === label && (p.customer || "") === customer);
-  if (!row) {
-    row = { year, item_label: label, customer, budget: null, q2_budget: null, q3_budget: null, q4_budget: null, next_budget: null, source: "직접 입력" };
-    rows.push(row);
-  }
-  row.next_budget = parseNum(value) || null;
-  store.planValues = rows;
-  await api("/api/plan-values", { method: "PUT", body: rows });
-  renderPerformance();
+// DOM → store 로 현재 그리드 상태 수집(구조 변경 전 미저장 편집 보존)
+function collectItemBudgets() {
+  const secs = [];
+  $$("#itemBudgetGrid .ib-section").forEach((secEl) => {
+    const id = secEl.dataset.ibSection;
+    const item = secEl.querySelector(".ib-item-name").value.trim();
+    const customers = [];
+    secEl.querySelectorAll("tr[data-ib-cust]").forEach((tr) => {
+      const cust = { id: tr.dataset.ibCust, name: tr.querySelector(".ib-cell-name").value.trim() };
+      tr.querySelectorAll(".ib-cell").forEach((inp) => {
+        const raw = inp.value.trim();
+        cust[inp.dataset.ibField] = raw === "" ? null : parseNum(raw);
+      });
+      customers.push(cust);
+    });
+    secs.push({ id, item, customers });
+  });
+  return secs;
+}
+async function saveItemBudgets() {
+  store.itemBudgets = collectItemBudgets();
+  await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
+}
+function recalcIbSection(secEl) {
+  const t = {};
+  for (const f of IB_FIELDS) t[f.key] = 0;
+  secEl.querySelectorAll("tr[data-ib-cust]").forEach((tr) => {
+    tr.querySelectorAll(".ib-cell").forEach((inp) => { t[inp.dataset.ibField] += parseNum(inp.value); });
+  });
+  secEl.querySelectorAll("[data-ib-total]").forEach((td) => { td.textContent = won(t[td.dataset.ibTotal]); });
+  const grand = $$("#itemBudgetGrid .ib-section").reduce((s, el) => {
+    let b = 0; el.querySelectorAll('.ib-cell[data-ib-field="budget"]').forEach((i) => { b += parseNum(i.value); }); return s + b;
+  }, 0);
+  $("itemBudgetGrandBadge").textContent = `2026 예산 합계 ${won(grand)}`;
+}
+async function ibAddCustomer(secId) {
+  store.itemBudgets = collectItemBudgets();
+  const sec = store.itemBudgets.find((s) => s.id === secId);
+  if (!sec) return;
+  sec.customers = sec.customers || [];
+  sec.customers.push({ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, total: null });
+  await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
+  renderItemBudgets();
+}
+async function ibDeleteCustomer(secId, custId) {
+  store.itemBudgets = collectItemBudgets();
+  const sec = store.itemBudgets.find((s) => s.id === secId);
+  if (!sec) return;
+  sec.customers = (sec.customers || []).filter((c) => c.id !== custId);
+  await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
+  renderItemBudgets();
+}
+async function ibAddItem() {
+  store.itemBudgets = collectItemBudgets();
+  store.itemBudgets.push({ id: ibNewId("ib"), item: "새 ITEM", customers: [{ id: ibNewId("ibc"), name: "", result: null, budget: null, q2: null, q3: null, q4: null, total: null }] });
+  await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
+  renderItemBudgets();
+}
+async function ibDeleteItem(secId) {
+  const sec = (store.itemBudgets || []).find((s) => s.id === secId);
+  if (!confirm(`'${sec ? sec.item : "이 ITEM"}' 전체를 삭제할까요?`)) return;
+  store.itemBudgets = collectItemBudgets().filter((s) => s.id !== secId);
+  await api("/api/item-budgets", { method: "PUT", body: store.itemBudgets });
+  renderItemBudgets();
 }
 
 function openItemPerformanceDialog(code) {
@@ -1810,13 +1855,29 @@ function bindEvents() {
     const btn = e.target.closest("[data-bucket]"); if (!btn) return;
     openBucketDialog(btn.dataset.bucket);
   });
-  $("planItemFilters").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-plan-item]"); if (!btn) return;
-    ui.planItem = btn.dataset.planItem; renderPlanItemFilters(); renderFuturePlan(ui.year);
+  // ITEM별 BUDGET & 실적 (분기별) 편집 그리드
+  $("addItemBudgetBtn").addEventListener("click", ibAddItem);
+  const ibGrid = $("itemBudgetGrid");
+  ibGrid.addEventListener("input", (e) => {
+    const cell = e.target.closest(".ib-cell");
+    if (!cell) return;
+    const caretEnd = cell.selectionStart === cell.value.length;
+    const n = parseNum(cell.value);
+    cell.value = cell.value.trim() === "" ? "" : (n ? won(n) : "");
+    if (caretEnd) cell.setSelectionRange(cell.value.length, cell.value.length);
+    const secEl = cell.closest(".ib-section");
+    if (secEl) recalcIbSection(secEl);
   });
-  $("futurePlanBody").addEventListener("change", (e) => {
-    const input = e.target.closest(".plan-next-input"); if (!input) return;
-    savePlanNext(input.dataset.planCustomer, input.dataset.planLabel, input.value);
+  ibGrid.addEventListener("change", (e) => {
+    if (e.target.closest(".ib-cell, .ib-cell-name, .ib-item-name")) saveItemBudgets();
+  });
+  ibGrid.addEventListener("click", (e) => {
+    const addC = e.target.closest("[data-ib-add-cust]");
+    if (addC) { ibAddCustomer(addC.closest(".ib-section").dataset.ibSection); return; }
+    const delC = e.target.closest("[data-ib-del-cust]");
+    if (delC) { const tr = delC.closest("tr"); ibDeleteCustomer(delC.closest(".ib-section").dataset.ibSection, tr.dataset.ibCust); return; }
+    const delI = e.target.closest("[data-ib-del-item]");
+    if (delI) { ibDeleteItem(delI.closest(".ib-section").dataset.ibSection); return; }
   });
   $("yearlyAnalysisBody").addEventListener("change", (e) => {
     const input = e.target.closest(".yearly-input"); if (!input) return;

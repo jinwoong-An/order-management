@@ -76,13 +76,23 @@ const API = {
 
   // 앱 시작 시 모든 컬렉션을 한 번에 반환 (호출 수/콜드스타트 최소화)
   "GET /api/bootstrap": async (_req, res) => {
-    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos] =
+    const [orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos, itemBudgets] =
       await Promise.all([
         readCollection("orders"), readCollection("annualMetrics"), readCollection("planValues"),
         readCollection("recurringForecasts"), readCollection("forecasts"), readCollection("monthlyPlans"),
         readCollection("yearlyAnalysis"), readCollection("customerPlans"), readCollection("events"), readCollection("todos"),
+        readCollection("itemBudgets"),
       ]);
-    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos });
+    sendJson(res, 200, { orders, annualMetrics, planValues, recurringForecasts, forecasts, monthlyPlans, yearlyAnalysis, customerPlans, events, todos, itemBudgets });
+  },
+
+  // ---- ITEM별 BUDGET & 실적 (분기별) ----
+  "GET /api/item-budgets": async (_req, res) => sendJson(res, 200, await readCollection("itemBudgets")),
+  "PUT /api/item-budgets": async (req, res) => {
+    const body = await readBody(req);
+    const rows = Array.isArray(body) ? body : [];
+    await writeCollection("itemBudgets", rows);
+    sendJson(res, 200, rows);
   },
 
   // ---- 일정(캘린더) ----

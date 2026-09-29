@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.7.0" rel="stylesheet"/>
+<link href="/styles.css?v=64.8.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -129,12 +129,10 @@
 
 <article class="panel compact-bucket-panel"><div class="panel-head"><div><h2>거래금액별 업체</h2><p>세금계산서 기준 연간 거래금액 구간입니다. 버튼을 누르면 업체 상세가 표시됩니다.</p></div></div><div class="amount-bucket-grid compact" id="amountBucketGrid"></div></article>
 
-<article class="panel future-plan-panel">
-<div class="panel-head"><div><h2>ITEM별 BUDGET</h2><p><strong>2026(2).xlsx 기준 BUDGET 업체</strong>입니다. ETC를 선택하면 ETC BUDGET과 함께 올해 실제 세금계산서가 발행된 ETC 거래업체별 현재 TOTAL도 표시합니다. 4분기 NEW BUDGET을 입력하면 위 ITEM별 실적의 4분기 금액에 자동 합산됩니다.</p></div><span class="reconcile-badge" id="budgetPlanReconcileBadge">금액 확인중</span></div>
-<div class="item-budget-layout">
-<div class="plan-item-filters vertical" id="planItemFilters"></div>
-<div class="table-scroll future-plan-scroll"><table class="data-table future-plan-table"><thead><tr><th>업체</th><th class="number">올해 BUDGET</th><th class="number">2분기<br>NEW BUDGET</th><th class="number">3분기<br>NEW BUDGET</th><th class="number next-budget-head">4분기<br>NEW BUDGET<br><small>직접 입력</small></th><th class="number current-total-head">현재 TOTAL<br><small>세금계산서</small></th><th class="number">달성율<br><small>마지막 NEW BUDGET</small></th></tr></thead><tbody id="futurePlanBody"></tbody></table></div>
-</div>
+<article class="panel item-budget-panel">
+<div class="panel-head"><div><h2>ITEM별 BUDGET &amp; 실적 (분기별)</h2><p>ITEM · 업체별로 2025 실적과 2026 예산(연간/2·3·4분기), TOTAL을 직접 입력·수정합니다. 값을 바꾸면 자동 저장되고, 업체·ITEM 행도 추가/삭제할 수 있습니다.</p></div><span class="reconcile-badge ok" id="itemBudgetGrandBadge">합계</span></div>
+<div class="item-budget-grid" id="itemBudgetGrid"></div>
+<button class="button secondary add-item-budget-btn" id="addItemBudgetBtn" type="button"><svg viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>ITEM 추가</span></button>
 </article>
 
 <article class="panel yearly-analysis-panel">
@@ -374,6 +372,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.7.0" type="module"></script>
+<script src="/app.js?v=64.8.0" type="module"></script>
 </body>
 </html>

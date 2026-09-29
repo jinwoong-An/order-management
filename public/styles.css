@@ -288,6 +288,24 @@ small { font-size: 12px; }
 .yearly-input { width: 80px; }
 .plan-next-input:focus, .yearly-input:focus { border-color: var(--brand); outline: none; }
 
+/* ITEM별 BUDGET & 실적 편집 그리드 */
+.item-budget-grid { display: flex; flex-direction: column; gap: 22px; }
+.ib-section { border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 12px; background: var(--panel); }
+.ib-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ib-item-name { font-size: 16px; font-weight: 800; color: var(--ink); border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; background: transparent; min-width: 160px; }
+.ib-item-name:hover { border-color: var(--line); }
+.ib-item-name:focus { border-color: var(--brand); outline: none; background: #fff; }
+.ib-table { min-width: 720px; }
+.ib-table th { font-size: 11px; white-space: nowrap; }
+.ib-table td { padding: 5px 6px; }
+.ib-cell-name { width: 100%; min-width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; }
+.ib-cell { width: 96px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; text-align: right; font-size: 13px; }
+.ib-cell:focus, .ib-cell-name:focus { border-color: var(--brand); outline: none; }
+.ib-table tfoot .ib-total-row td { border-top: 2px solid var(--line); background: var(--brand-soft); font-weight: 700; }
+.ib-rowdel { width: 34px; text-align: center; }
+.ib-add-cust { margin-top: 10px; }
+.add-item-budget-btn { margin-top: 18px; }
+
 .yearly-chart-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
 .yearly-chart-title { margin-bottom: 12px; }
 .yearly-chart-title h3 { font-size: 14px; }
