@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=64.9.0" rel="stylesheet"/>
+<link href="/styles.css?v=65.0.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -123,8 +123,8 @@
 </div>
 
 <article class="panel performance-item-panel">
-<div class="panel-head"><div><h2>ITEM별 실적</h2><p><strong>2026(2).xlsx 기준:</strong> 올해 BUDGET과 2·3분기 NEW BUDGET을 적용했습니다. 4분기 NEW BUDGET은 아래 ITEM별 BUDGET에서 업체별로 입력한 금액을 자동 합산합니다.</p></div><span class="reconcile-badge" id="itemReconcileBadge">금액 일치</span></div>
-<div class="table-scroll performance-item-scroll"><table class="data-table performance-item-table"><thead><tr><th>ITEM</th><th class="number">거래업체수</th><th class="number fixed-new-budget-head">올해<br>BUDGET</th><th class="number fixed-new-budget-head">2분기<br>NEW BUDGET</th><th class="number fixed-new-budget-head">3분기<br>NEW BUDGET</th><th class="number future-budget-head">4분기<br>NEW BUDGET<br><small>업체 합계</small></th><th class="number item-total-head">TOTAL 금액<br><small>(계산서)</small></th><th class="number">달성율<br><small>마지막 NEW BUDGET</small></th></tr></thead><tbody id="itemPerformanceBody"></tbody></table></div>
+<div class="panel-head"><div><h2>ITEM별 실적</h2><p>아래 <strong>ITEM별 BUDGET &amp; 실적</strong> 표를 기준으로 ITEM별 예산(연간/2·3·4분기)을 합산하고, TOTAL 금액은 세금계산서 발행 발주를 자동 집계합니다. <strong>ETC 상품 금액은 같은 발주의 다른 품목에 배분</strong>됩니다. ITEM을 누르면 거래처별 실적을 볼 수 있습니다.</p></div><span class="reconcile-badge ok" id="itemReconcileBadge">실적 합계</span></div>
+<div class="table-scroll performance-item-scroll"><table class="data-table performance-item-table"><thead><tr><th>ITEM</th><th class="number">거래업체수</th><th class="number fixed-new-budget-head">2026<br>예산</th><th class="number fixed-new-budget-head">2분기<br>예산</th><th class="number fixed-new-budget-head">3분기<br>예산</th><th class="number future-budget-head">4분기<br>예산</th><th class="number item-total-head">TOTAL 금액<br><small>(계산서)</small></th><th class="number">달성율<br><small>마지막 예산 대비</small></th></tr></thead><tbody id="itemPerformanceBody"></tbody></table></div>
 </article>
 
 <article class="panel compact-bucket-panel"><div class="panel-head"><div><h2>거래금액별 업체</h2><p>세금계산서 기준 연간 거래금액 구간입니다. 버튼을 누르면 업체 상세가 표시됩니다.</p></div></div><div class="amount-bucket-grid compact" id="amountBucketGrid"></div></article>
@@ -372,6 +372,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=64.9.0" type="module"></script>
+<script src="/app.js?v=65.0.0" type="module"></script>
 </body>
 </html>

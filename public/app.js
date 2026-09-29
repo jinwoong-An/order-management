@@ -555,11 +555,40 @@ function invoiceTotalsByItem(year) {
 
 function renderPerformance() {
   const year = ui.year;
-  const { totals, custs } = invoiceTotalsByItem(year);
-  const budgetSum = ITEM_CODES.reduce((s, c) => s + (metricFor(year, c) ? parseNum(metricFor(year, c).budget) : 0), 0);
-  const invAmt = ITEM_CODES.reduce((s, c) => s + totals[c], 0);
+  const secs = store.itemBudgets || [];
+  const actualsMap = ibActualsByItem(year);
   const invOrders = store.orders.filter((o) => yearOf(o.invoiceDate) === year);
   const custCount = new Set(invOrders.map((o) => (o.customer || "").trim()).filter(Boolean)).size;
+
+  // ITEM별 실적 테이블 — 새 ITEM별 BUDGET(엑셀) 기준 · ETC 상품은 동반 품목에 배분됨
+  let budgetSum = 0;
+  let invAmt = 0;
+  $("itemPerformanceBody").innerHTML = secs.map((sec) => {
+    const cs = sec.customers || [];
+    const budget = cs.reduce((s, c) => s + parseNum(c.budget), 0);
+    const q2 = cs.reduce((s, c) => s + parseNum(c.q2), 0);
+    const q3 = cs.reduce((s, c) => s + parseNum(c.q3), 0);
+    const q4 = cs.reduce((s, c) => s + parseNum(c.q4), 0);
+    const secActuals = actualsMap.get((sec.item || "").trim().toUpperCase()) || new Map();
+    let total = 0; let custN = 0;
+    for (const v of secActuals.values()) { total += v.amount; if (v.amount > 0) custN += 1; }
+    budgetSum += budget; invAmt += total;
+    const lastBudget = q4 || q3 || q2 || budget;
+    const rate = lastBudget ? `${Math.round((total / lastBudget) * 1000) / 10}%` : "-";
+    const code = NAME_TO_CODE[sec.item] || "ETC";
+    const pill = NAME_TO_CODE[sec.item] || (sec.item || "?").slice(0, 2).toUpperCase();
+    return `<tr class="item-row" data-item-detail="${escapeHtml(sec.item)}">
+      <td><span class="item-pill item-${code}">${escapeHtml(pill)}</span> ${escapeHtml(sec.item)}</td>
+      <td class="number">${custN}</td>
+      <td class="number">${won(budget)}</td>
+      <td class="number">${won(q2)}</td>
+      <td class="number">${won(q3)}</td>
+      <td class="number">${q4 ? won(q4) : "-"}</td>
+      <td class="number strong">${won(total)}</td>
+      <td class="number">${rate}</td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="muted">ITEM별 BUDGET에서 ITEM을 추가하세요.</td></tr>`;
+  $("itemReconcileBadge").textContent = `실적 합계 ${won(invAmt)}`;
+  $("itemReconcileBadge").className = "reconcile-badge ok";
 
   $("perfBudgetAmount").textContent = budgetSum ? won(budgetSum) : "-";
   $("perfBudgetYearLabel").textContent = `${year}년`;
@@ -568,30 +597,6 @@ function renderPerformance() {
   $("perfAchievementRate").textContent = budgetSum ? `${Math.round((invAmt / budgetSum) * 1000) / 10}%` : "-";
   $("perfInvoiceCount").textContent = `${invOrders.length}건`;
   $("perfCustomerCount").textContent = `${custCount}곳`;
-
-  // ITEM별 실적 테이블
-  let itemMatch = true;
-  $("itemPerformanceBody").innerHTML = ITEM_CODES.map((c) => {
-    const m = metricFor(year, c);
-    const budget = m ? parseNum(m.budget) : 0;
-    const q2 = m ? parseNum(m.q2_new_budget) : 0;
-    const q3 = m ? parseNum(m.q3_new_budget) : 0;
-    const q4 = q4SumForItem(year, c);
-    const total = totals[c];
-    const lastBudget = q4 || q3 || q2 || budget;
-    const rate = lastBudget ? `${Math.round((total / lastBudget) * 1000) / 10}%` : "-";
-    return `<tr class="item-row" data-item-detail="${c}">
-      <td><span class="item-pill item-${c}">${c}</span> ${ITEM_NAME[c]}</td>
-      <td class="number">${custs[c].size}</td>
-      <td class="number">${won(budget)}</td>
-      <td class="number">${won(q2)}</td>
-      <td class="number">${won(q3)}</td>
-      <td class="number">${q4 ? won(q4) : "-"}</td>
-      <td class="number strong">${won(total)}</td>
-      <td class="number">${rate}</td></tr>`;
-  }).join("");
-  $("itemReconcileBadge").textContent = itemMatch ? "금액 일치" : "금액 확인 필요";
-  $("itemReconcileBadge").className = `reconcile-badge ${itemMatch ? "ok" : "warn"}`;
 
   renderAmountBuckets(year);
   renderItemBudgets();
@@ -653,22 +658,34 @@ function ibNewId(prefix) { return `${prefix}_${Date.now().toString(36)}_${Math.r
 function ibCellVal(v) { return (v === null || v === undefined || v === "") ? "" : won(v); }
 // 업체명 정규화(끝의 마침표/공백 제거, 소문자) — ETC 및 업체 매칭용
 function ibNorm(s) { return String(s || "").trim().replace(/[.．\s]+$/g, "").replace(/\s+/g, " ").toLowerCase(); }
-// 발주 실적: 세금계산서 발행(처리 완료) 건을 ITEM명 → 업체명 → 금액 으로 집계
+// 발주 실적: 세금계산서 발행(처리 완료) 건을 ITEM명 → 업체명 → {금액,건수} 로 집계.
+// ETC 상품 금액은 같은 발주에 함께 나온 다른 품목에 (금액 비율로) 배분한다.
 function ibActualsByItem(year) {
-  const map = new Map(); // itemNameUpper -> Map(custNorm -> {name, amount})
+  const map = new Map(); // itemNameUpper -> Map(custNorm -> {name, amount, count})
+  const add = (itemName, cust, amount, countInc) => {
+    const key = String(itemName).toUpperCase();
+    if (!map.has(key)) map.set(key, new Map());
+    const m = map.get(key);
+    const k = ibNorm(cust);
+    if (!m.has(k)) m.set(k, { name: cust, amount: 0, count: 0 });
+    m.get(k).amount += amount;
+    m.get(k).count += countInc;
+  };
   for (const o of store.orders) {
     if (yearOf(o.invoiceDate) !== year) continue; // 처리 완료(계산서 발행)만
     const cust = (o.customer || "").trim() || "미지정";
-    const items = (o.items && o.items.length) ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
-    for (const it of items) {
-      const code = ITEM_CODES.includes(it.item) ? it.item : "ETC";
-      const itemName = (ITEM_NAME[code] || code).toUpperCase();
-      if (!map.has(itemName)) map.set(itemName, new Map());
-      const m = map.get(itemName);
-      const k = ibNorm(cust);
-      if (!m.has(k)) m.set(k, { name: cust, amount: 0 });
-      m.get(k).amount += parseNum(it.amount);
+    const lines = (o.items && o.items.length) ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
+    const nonEtc = lines.filter((it) => ITEM_CODES.includes(it.item) && it.item !== "ETC");
+    const etcAmt = lines.reduce((s, it) => s + ((!ITEM_CODES.includes(it.item) || it.item === "ETC") ? parseNum(it.amount) : 0), 0);
+    const nonEtcSum = nonEtc.reduce((s, it) => s + parseNum(it.amount), 0);
+    if (nonEtc.length) {
+      for (const it of nonEtc) {
+        const base = parseNum(it.amount);
+        const share = nonEtcSum > 0 ? etcAmt * (base / nonEtcSum) : etcAmt / nonEtc.length;
+        add(ITEM_NAME[it.item] || it.item, cust, base + share, 1);
+      }
     }
+    // ETC만 있는 발주(배분할 품목이 없음)는 ITEM별 집계에서 제외
   }
   return map;
 }
@@ -809,29 +826,16 @@ async function ibDeleteItem(secId) {
   renderItemBudgets();
 }
 
-function openItemPerformanceDialog(code) {
+function openItemPerformanceDialog(itemName) {
   const year = ui.year;
-  const map = new Map();
-  let total = 0;
-  for (const o of store.orders) {
-    if (yearOf(o.invoiceDate) !== year) continue;
-    const name = (o.customer || "미지정").trim();
-    const items = o.items && o.items.length ? o.items : [{ item: "ETC", amount: orderTotal(o) }];
-    for (const it of items) {
-      const c = ITEM_CODES.includes(it.item) ? it.item : "ETC";
-      if (c !== code) continue;
-      if (!map.has(name)) map.set(name, { name, count: 0, amount: 0 });
-      const r = map.get(name);
-      r.count += 1;
-      r.amount += parseNum(it.amount);
-      total += parseNum(it.amount);
-    }
-  }
-  const rows = [...map.values()].sort((a, b) => b.amount - a.amount);
+  const secActuals = ibActualsByItem(year).get((itemName || "").toUpperCase()) || new Map();
+  const rows = [...secActuals.values()].filter((r) => r.amount > 0).sort((a, b) => b.amount - a.amount);
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const code = NAME_TO_CODE[itemName] || "ETC";
   const dlg = $("itemPerformanceDialog");
   dlg.dataset.itemTheme = code;
-  $("itemPerformanceDialogTitle").textContent = `${code} · ${ITEM_NAME[code]} 거래처 실적`;
-  $("itemPerformanceDialogSubtitle").textContent = `${year}년 세금계산서 기준 · 합계 ${won(total)}`;
+  $("itemPerformanceDialogTitle").textContent = `${itemName} 거래처 실적`;
+  $("itemPerformanceDialogSubtitle").textContent = `${year}년 세금계산서 기준 · 합계 ${won(total)} · ETC 상품 배분 포함`;
   $("itemPerformanceDialogBody").innerHTML = rows.length
     ? rows.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="number">${r.count}건</td><td class="number">${won(r.amount)}</td><td class="number">${total ? Math.round((r.amount / total) * 1000) / 10 : 0}%</td></tr>`).join("")
     : "<tr><td colspan='4' class='muted'>해당 ITEM 계산서 내역이 없습니다.</td></tr>";
