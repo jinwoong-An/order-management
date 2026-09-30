@@ -116,12 +116,23 @@ export async function buildSubmissionHtml(title, type) {
   const monthlyPlans = {};
   for (const p of plans) if (Number(p.year) === YEAR) monthlyPlans[Number(p.month)] = p.text || "";
 
-  const monthsSet = results.map((r) => r.mo).concat(Object.keys(monthlyPlans).map(Number)).filter(Boolean);
-  const maxMonth = monthsSet.length ? Math.max(...monthsSet) : 12;
+  const now = new Date();
+  const curMonth = now.getFullYear() === YEAR ? (now.getMonth() + 1) : 0;
+  // 발주예상/계산서예상/월계획은 '다음 달'에 표시되므로, 그 데이터가 있는 달-1도 보고서 월에 포함
+  const fwd = [
+    ...orderForecasts.map((f) => f.mo),
+    ...invoiceForecasts.map((f) => f.mo),
+    ...pipeline.map((p) => p.dueMo),
+    ...Object.keys(monthlyPlans).map(Number),
+  ].filter(Boolean).map((m) => m - 1).filter((m) => m >= 1);
+  const monthsSet = results.map((r) => r.mo).concat(fwd).concat(curMonth ? [curMonth] : []).filter(Boolean);
+  const maxMonth = monthsSet.length ? Math.max(...monthsSet) : (curMonth || 12);
+  // 기본으로 열리는 보고서 월: 작성일(오늘) 당월(범위 내) → 그 다음 달 예상/계획이 보임
+  const reportDefault = curMonth && curMonth <= maxMonth ? curMonth : maxMonth;
 
   const safeTitle = title && title.trim() ? title.trim() : `${YEAR} JWA 실적 보고`;
   const generatedAt = new Date().toLocaleString("ko-KR");
-  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, invoiceForecasts, monthlyPlans, maxMonth, qLabel };
+  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, invoiceForecasts, monthlyPlans, maxMonth, reportDefault, qLabel };
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -259,7 +270,7 @@ table.rt tfoot td{background:#1c2333;font-weight:700;}
 <script id="data" type="application/json">${JSON.stringify(payload).replace(/</g, "\\u003c")}<\/script>
 <script>
 var DATA=JSON.parse(document.getElementById('data').textContent);
-var YEAR=DATA.year, PREV=DATA.prevYear, MAXM=DATA.maxMonth||12;
+var YEAR=DATA.year, PREV=DATA.prevYear, MAXM=DATA.maxMonth||12, RDEF=DATA.reportDefault||MAXM;
 var ITEMS=DATA.items, CODES=ITEMS.map(function(i){return i.code;});
 var CNAME={}; ITEMS.forEach(function(i){CNAME[i.code]=i.name;});
 var PCOL={D:'#58a6ff',F:'#39d353',G:'#ffa657',H:'#ff6e96',I:'#3fb950',J:'#bc8cff',ETC:'#8b949e'};
@@ -392,9 +403,9 @@ function reportMonth(mo){
   html+='<div class="section"><div class="sec-hdr"><span>&#128196;</span><h3>'+nlbl+' 세금계산서 예상 <span style="font-size:11px;color:#6e7681;font-weight:400">(다음 달)</span></h3><span class="cnt">'+pall.length+'건</span></div><div class="sec-body">';
   if(pall.length){html+='<table class="rt"><thead><tr><th style="width:140px">업체</th><th>모델</th><th style="width:60px">근거</th><th style="width:120px">예상금액</th></tr></thead><tbody>';var pet=0;pall.forEach(function(p){var md=p.items.map(function(it){return (it.model||'')+(it.qty?' ×'+it.qty:'');}).join(', ');html+='<tr><td>'+esc(p.cust)+'</td><td style="color:#c9d1d9">'+esc(md||'-')+'</td><td style="text-align:center;color:#8b949e;font-size:11px">'+p.src+'</td><td style="text-align:right">'+fmtT(p.total)+'</td></tr>';pet+=p.total;});html+='</tbody><tfoot><tr><td colspan="3" style="text-align:right;color:#8b949e">합계</td><td style="text-align:right;color:#3fb950">'+fmtT(pet)+'</td></tr></tfoot></table>';}else{html+='<div class="empty">'+nlbl+' 세금계산서 예상이 없습니다.</div>';}
   html+='</div></div>';
-  // 월 주요 계획
-  var plan=DATA.monthlyPlans[mo]||'';
-  html+='<div class="section"><div class="sec-hdr"><span>&#128197;</span><h3>'+mo+'월 주요 계획</h3></div><div class="sec-body">'+(plan?'<div class="plan-text">'+esc(plan)+'</div>':'<div class="empty">등록된 월 계획이 없습니다.</div>')+'</div></div>';
+  // 주요 계획 (다음 달)
+  var plan=DATA.monthlyPlans[nmo]||'';
+  html+='<div class="section"><div class="sec-hdr"><span>&#128197;</span><h3>'+nlbl+' 주요 계획 <span style="font-size:11px;color:#6e7681;font-weight:400">(다음 달)</span></h3></div><div class="sec-body">'+(plan?'<div class="plan-text">'+esc(plan)+'</div>':'<div class="empty">등록된 '+nlbl+' 계획이 없습니다.</div>')+'</div></div>';
   body.innerHTML=html;
 }
 function buildReportMonths(){
@@ -404,7 +415,7 @@ function buildReportMonths(){
 }
 
 window.addEventListener('DOMContentLoaded',function(){
-  buildFilters();buildReportMonths();upNotice();upTable();initCharts();reportMonth(MAXM);
+  buildFilters();buildReportMonths();upNotice();upTable();initCharts();reportMonth(RDEF);
 });
 <\/script>
 </body>
