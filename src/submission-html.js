@@ -102,6 +102,16 @@ export async function buildSubmissionHtml(title, type) {
       note: f.note || "",
       items: (f.items || []).map((it) => ({ c: ITEM_CODES.includes(it.item) ? it.item : "ETC", model: it.model || "", qty: it.quantity || null })),
     }));
+  // 직접 추가된 계산서 예상 (type invoice) — 계산서 예상월 기준
+  const invoiceForecasts = forecasts
+    .filter((f) => f.type === "invoice" && yOf(f.invoiceMonth || f.entryMonth) === YEAR)
+    .map((f) => ({
+      mo: mOf(f.invoiceMonth || f.entryMonth),
+      cust: f.customer || "",
+      total: num(f.amount) || (f.items || []).reduce((s, it) => s + num(it.amount), 0),
+      note: f.note || "",
+      items: (f.items || []).map((it) => ({ c: ITEM_CODES.includes(it.item) ? it.item : "ETC", model: it.model || "", qty: it.quantity || null })),
+    }));
 
   const monthlyPlans = {};
   for (const p of plans) if (Number(p.year) === YEAR) monthlyPlans[Number(p.month)] = p.text || "";
@@ -111,7 +121,7 @@ export async function buildSubmissionHtml(title, type) {
 
   const safeTitle = title && title.trim() ? title.trim() : `${YEAR} JWA 실적 보고`;
   const generatedAt = new Date().toLocaleString("ko-KR");
-  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, monthlyPlans, maxMonth, qLabel };
+  const payload = { title: safeTitle, generatedAt, year: YEAR, prevYear: PREV, items: ITEMS, budgets, prevByItem, results, pipeline, orderForecasts, invoiceForecasts, monthlyPlans, maxMonth, qLabel };
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -368,15 +378,19 @@ function reportMonth(mo){
     html+='<div class="brand-total"><span>합계</span><span style="color:#3fb950;font-weight:700">'+fmtT(resTot)+'</span></div></div></div>';
   } else { html+='<div class="empty">해당 월 세금계산서 결과가 없습니다.</div>'; }
   html+='</div></div>';
-  // 발주 예상
-  var of=DATA.orderForecasts.filter(function(f){return f.mo===mo;});
-  html+='<div class="section"><div class="sec-hdr"><span>&#128230;</span><h3>'+mo+'월 발주 예상</h3><span class="cnt">'+of.length+'건</span></div><div class="sec-body">';
-  if(of.length){html+='<table class="rt"><thead><tr><th style="width:130px">업체</th><th>모델</th><th style="width:110px">예상금액</th></tr></thead><tbody>';var oft=0;of.forEach(function(f){var md=f.items.map(function(it){return (it.model||'')+(it.qty?' ×'+it.qty:'');}).join(', ');html+='<tr><td>'+esc(f.cust)+'</td><td style="color:#c9d1d9">'+esc(md||'-')+'</td><td style="text-align:right">'+fmtT(f.amt)+'</td></tr>';oft+=f.amt;});html+='</tbody><tfoot><tr><td colspan="2" style="text-align:right;color:#8b949e">합계</td><td style="text-align:right;color:#3fb950">'+fmtT(oft)+'</td></tr></tfoot></table>';}else{html+='<div class="empty">직접 추가된 발주 예상이 없습니다.</div>';}
+  // 발주 예상 · 계산서 예상은 '작성월(선택월)의 다음 달' 기준
+  var nmo=mo+1; var nlbl=nmo>12?'다음달':(nmo+'월');
+  // 발주 예상 (다음 달)
+  var of=DATA.orderForecasts.filter(function(f){return f.mo===nmo;});
+  html+='<div class="section"><div class="sec-hdr"><span>&#128230;</span><h3>'+nlbl+' 발주 예상 <span style="font-size:11px;color:#6e7681;font-weight:400">(다음 달)</span></h3><span class="cnt">'+of.length+'건</span></div><div class="sec-body">';
+  if(of.length){html+='<table class="rt"><thead><tr><th style="width:130px">업체</th><th>모델</th><th style="width:110px">예상금액</th></tr></thead><tbody>';var oft=0;of.forEach(function(f){var md=f.items.map(function(it){return (it.model||'')+(it.qty?' ×'+it.qty:'');}).join(', ');html+='<tr><td>'+esc(f.cust)+'</td><td style="color:#c9d1d9">'+esc(md||'-')+'</td><td style="text-align:right">'+fmtT(f.amt)+'</td></tr>';oft+=f.amt;});html+='</tbody><tfoot><tr><td colspan="2" style="text-align:right;color:#8b949e">합계</td><td style="text-align:right;color:#3fb950">'+fmtT(oft)+'</td></tr></tfoot></table>';}else{html+='<div class="empty">'+nlbl+' 발주 예상이 없습니다.</div>';}
   html+='</div></div>';
-  // 계산서 예상 (납기 그 달, 미계산서)
-  var pe=DATA.pipeline.filter(function(p){return p.dueMo===mo;});
-  html+='<div class="section"><div class="sec-hdr"><span>&#128196;</span><h3>'+mo+'월 세금계산서 예상</h3><span class="cnt">'+pe.length+'건</span></div><div class="sec-body">';
-  if(pe.length){html+='<table class="rt"><thead><tr><th style="width:140px">업체</th><th>모델</th><th style="width:130px">예상금액</th></tr></thead><tbody>';var pet=0;pe.forEach(function(p){var md=p.items.map(function(it){return (it.model||'')+(it.qty?' ×'+it.qty:'');}).join(', ');html+='<tr><td>'+esc(p.cust)+'</td><td style="color:#c9d1d9">'+esc(md||'-')+'</td><td style="text-align:right">'+fmtT(p.total)+'</td></tr>';pet+=p.total;});html+='</tbody><tfoot><tr><td colspan="2" style="text-align:right;color:#8b949e">합계</td><td style="text-align:right;color:#3fb950">'+fmtT(pet)+'</td></tr></tfoot></table>';}else{html+='<div class="empty">해당 월 납기 예정(미계산서) 발주가 없습니다.</div>';}
+  // 계산서 예상 (다음 달 납기 미계산서 + 직접 추가된 계산서 예상)
+  var pe=DATA.pipeline.filter(function(p){return p.dueMo===nmo;}).map(function(p){return {cust:p.cust,total:p.total,items:p.items,src:'납기'};});
+  var invf=(DATA.invoiceForecasts||[]).filter(function(f){return f.mo===nmo;}).map(function(f){return {cust:f.cust,total:f.total,items:f.items,src:'직접'};});
+  var pall=pe.concat(invf);
+  html+='<div class="section"><div class="sec-hdr"><span>&#128196;</span><h3>'+nlbl+' 세금계산서 예상 <span style="font-size:11px;color:#6e7681;font-weight:400">(다음 달)</span></h3><span class="cnt">'+pall.length+'건</span></div><div class="sec-body">';
+  if(pall.length){html+='<table class="rt"><thead><tr><th style="width:140px">업체</th><th>모델</th><th style="width:60px">근거</th><th style="width:120px">예상금액</th></tr></thead><tbody>';var pet=0;pall.forEach(function(p){var md=p.items.map(function(it){return (it.model||'')+(it.qty?' ×'+it.qty:'');}).join(', ');html+='<tr><td>'+esc(p.cust)+'</td><td style="color:#c9d1d9">'+esc(md||'-')+'</td><td style="text-align:center;color:#8b949e;font-size:11px">'+p.src+'</td><td style="text-align:right">'+fmtT(p.total)+'</td></tr>';pet+=p.total;});html+='</tbody><tfoot><tr><td colspan="3" style="text-align:right;color:#8b949e">합계</td><td style="text-align:right;color:#3fb950">'+fmtT(pet)+'</td></tr></tfoot></table>';}else{html+='<div class="empty">'+nlbl+' 세금계산서 예상이 없습니다.</div>';}
   html+='</div></div>';
   // 월 주요 계획
   var plan=DATA.monthlyPlans[mo]||'';
