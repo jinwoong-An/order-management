@@ -1485,14 +1485,20 @@ function renderForecastItemGroups() {
       <button type="button" class="fg-remove" data-fgroup="${idx}">×</button>
     </div>`).join("");
 }
-function openForecastDialog(forecast) {
+function openForecastDialog(forecast, forcedType) {
   ui.editingForecastId = forecast ? forecast.id : null;
-  const type = forecast ? forecast.type : (ui.forecastType === "order" ? "order" : "invoice");
+  const type = forecast ? forecast.type : (forcedType || (ui.forecastType === "order" ? "order" : "invoice"));
   $("forecastType").value = type;
-  $("forecastDialogTitle").textContent = forecast ? "예상 수정" : (type === "order" ? "발주 예상 직접 추가" : "계산서 예상 직접 추가");
+  const isInv = type === "invoice";
+  $("forecastDialogTitle").textContent = forecast ? "예상 수정" : (isInv ? "계산서 예상 직접 추가" : "발주 예상 직접 추가");
   const ym = `${ui.year}-${String(ui.forecastMonth).padStart(2, "0")}`;
   $("forecastEntryMonth").value = forecast?.entryMonth || ym;
-  $("forecastInvoiceMonth").value = forecast?.invoiceMonth || (type === "invoice" ? ym : "");
+  $("forecastInvoiceMonth").value = forecast?.invoiceMonth || (isInv ? ym : "");
+  // 계산서 예상: 계산서 예상월을 주 입력으로, 발주 예상월 숨김 / 발주 예상: 그 반대
+  $("forecastEntryMonthLabel").hidden = isInv;
+  $("forecastInvoiceMonthLabel").hidden = !isInv;
+  $("forecastEntryMonth").required = !isInv;
+  $("forecastInvoiceMonth").required = isInv;
   $("forecastCustomer").value = forecast?.customer || "";
   $("forecastEntryAmount").value = forecast?.amount ? won(forecast.amount) : "";
   $("forecastNote").value = forecast?.note || "";
@@ -1980,7 +1986,8 @@ function bindEvents() {
 
   /* ---- 월간회의 ---- */
   $$(".forecast-tab").forEach((t) => t.addEventListener("click", () => { ui.forecastType = t.dataset.forecastType; renderForecastPanel(); }));
-  $("newForecastButton").addEventListener("click", () => openForecastDialog(null));
+  $("newForecastButton").addEventListener("click", () => openForecastDialog(null, "order"));
+  $("newInvoiceForecastButton").addEventListener("click", () => openForecastDialog(null, "invoice"));
   $("forecastBody").addEventListener("click", (e) => {
     const rec = e.target.closest("[data-recurring-edit]");
     const man = e.target.closest("[data-forecast-edit]");
