@@ -1221,10 +1221,12 @@ function renderTodoList() {
     const title = (t.title || "").trim();
     const body = (t.text || "").trim();
     const fuCount = Array.isArray(t.followups) ? t.followups.length : 0;
-    return `<div class="todo-item ${t.done ? "done" : ""}" data-todo-open="${t.id}">
+    const prio = t.priority || "normal";
+    const prioBadge = `<span class="todo-prio prio-${prio}"><em class="prio-dot prio-${prio}"></em>${PRIO_LABEL[prio] || "보통"}</span>`;
+    return `<div class="todo-item prio-border-${prio} ${t.done ? "done" : ""}" data-todo-open="${t.id}">
       <label class="todo-check"><input type="checkbox" data-todo-done="${t.id}" ${t.done ? "checked" : ""}/><span></span></label>
       <div class="todo-body">
-        ${title ? `<strong class="todo-title">${escapeHtml(title)}</strong>` : ""}
+        <div class="todo-head-row">${prioBadge}${title ? `<strong class="todo-title">${escapeHtml(title)}</strong>` : ""}</div>
         ${body ? `<span class="todo-text">${escapeHtml(body).replace(/\n/g, "<br>")}</span>` : ""}
         <span class="todo-meta">${fmtDateTime(t.createdAt)}${fuCount ? ` · 팔로우업 ${fuCount}` : ""}</span>
       </div>
@@ -1237,11 +1239,19 @@ async function addTodo(e) {
   const title = $("todoTitle").value.trim();
   const text = $("todoInput").value.trim();
   if (!title && !text) return;
-  await api("/api/todos", { method: "POST", body: { title, text, done: false } });
+  const priority = $("todoPriority").value || "normal";
+  await api("/api/todos", { method: "POST", body: { title, text, priority, done: false } });
   $("todoTitle").value = "";
   $("todoInput").value = "";
+  $("todoPriority").value = "normal";
   await refreshAll();
   renderTodoList();
+}
+async function setTodoPriority(id, priority) {
+  await api(`/api/todos/${id}`, { method: "PUT", body: { priority } });
+  await refreshAll();
+  renderTodoList();
+  if (ui.openTodoId === id) renderTodoDialog();
 }
 async function toggleTodoDone(id) {
   const t = store.todos.find((x) => x.id === id);
@@ -1271,14 +1281,22 @@ function renderTodoDialog() {
   if (!t) { $("todoDialog").close(); return; }
   const title = (t.title || "").trim();
   const body = (t.text || "").trim();
+  const prio = t.priority || "normal";
   $("todoDialogTitle").textContent = title || "할일";
+  const prioSel = `<select class="todo-dialog-prio prio-${prio}" id="todoDialogPrio">
+    <option value="high" ${prio === "high" ? "selected" : ""}>🔴 높음</option>
+    <option value="normal" ${prio === "normal" ? "selected" : ""}>🔵 보통</option>
+    <option value="low" ${prio === "low" ? "selected" : ""}>⚪ 낮음</option></select>`;
   $("todoDialogOrigin").innerHTML = `
+    <div class="todo-origin-head"><span class="todo-prio-caption">중요도</span>${prioSel}</div>
     ${body ? `<div class="todo-origin-text">${escapeHtml(body).replace(/\n/g, "<br>")}</div>` : `<div class="todo-origin-text muted">내용 없음</div>`}
     <div class="todo-origin-meta">작성 ${fmtDateTime(t.createdAt)}${t.done ? " · ✅ 완료" : ""}</div>`;
-  const fus = Array.isArray(t.followups) ? t.followups : [];
+  // 최신 팔로우업이 맨 위로 (강조)
+  const fus = (Array.isArray(t.followups) ? t.followups : []).slice().reverse();
   $("todoThreadEmpty").hidden = fus.length > 0;
-  $("todoThread").innerHTML = fus.map((f) => `
-    <div class="todo-fu">
+  $("todoThread").innerHTML = fus.map((f, i) => `
+    <div class="todo-fu ${i === 0 ? "latest" : ""}">
+      ${i === 0 ? `<span class="todo-fu-badge">최신</span>` : ""}
       <div class="todo-fu-text">${escapeHtml(f.text).replace(/\n/g, "<br>")}</div>
       <div class="todo-fu-foot"><span class="todo-fu-meta">${fmtDateTime(f.at)}</span><button class="mini-btn danger" data-fu-del="${f.id}" title="삭제">✕</button></div>
     </div>`).join("");
@@ -2064,6 +2082,11 @@ function bindEvents() {
   $("todoList").addEventListener("change", (e) => {
     const done = e.target.closest("[data-todo-done]");
     if (done) toggleTodoDone(done.dataset.todoDone);
+  });
+  // 할일 상세 창: 중요도 변경
+  $("todoDialogOrigin").addEventListener("change", (e) => {
+    const sel = e.target.closest("#todoDialogPrio");
+    if (sel && ui.openTodoId) setTodoPriority(ui.openTodoId, sel.value);
   });
   // 할일 상세 창(팔로우업)
   $("todoFollowupForm").addEventListener("submit", addFollowup);

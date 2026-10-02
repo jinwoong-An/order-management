@@ -538,6 +538,20 @@ small { font-size: 12px; }
 .mini-btn.danger { color: #d43b31; border-color: #f2c8c4; }
 .mini-btn.danger:hover { background: #fbe3e1; }
 
+/* 할일 중요도 */
+.todo-add-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.todo-prio-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.todo-prio-label select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: var(--panel); color: var(--ink); }
+.todo-head-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.todo-prio { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
+.todo-prio.prio-high { background: #fbe3e1; color: #d43b31; }
+.todo-prio.prio-normal { background: #e7f0ff; color: #2b6fd6; }
+.todo-prio.prio-low { background: #eef0f4; color: #6b7589; }
+.todo-item { border-left: 4px solid var(--line); }
+.todo-item.prio-border-high { border-left-color: #e5544b; }
+.todo-item.prio-border-normal { border-left-color: #4f7bf0; }
+.todo-item.prio-border-low { border-left-color: #c2c9d6; }
+
 /* 할일 상세 창 (팔로우업) */
 .todo-dialog { max-width: 560px; width: 92vw; }
 .todo-dialog-body { padding: 20px 22px 4px; max-height: 55vh; overflow-y: auto; }
@@ -545,10 +559,19 @@ small { font-size: 12px; }
 .todo-origin-text { font-size: 14px; color: var(--ink); line-height: 1.5; white-space: normal; word-break: break-word; }
 .todo-origin-text.muted { color: var(--muted); }
 .todo-origin-meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.todo-origin-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.todo-prio-caption { font-size: 11px; color: var(--muted); font-weight: 700; }
+.todo-dialog-prio { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-weight: 700; background: var(--panel); color: var(--ink); }
+.todo-dialog-prio.prio-high { color: #d43b31; border-color: #f2c8c4; }
+.todo-dialog-prio.prio-normal { color: #2b6fd6; }
+.todo-dialog-prio.prio-low { color: #6b7589; }
 .todo-thread-title { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; }
 .todo-thread { display: flex; flex-direction: column; gap: 10px; }
 .todo-thread-empty { font-size: 13px; color: var(--muted); padding: 6px 2px; }
 .todo-fu { position: relative; padding: 11px 13px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: 10px; }
+.todo-fu.latest { border: 1px solid #f0c24a; border-left: 3px solid #f0a000; background: #fffaef; box-shadow: 0 0 0 2px rgba(240,160,0,.12); }
+.todo-fu-badge { position: absolute; top: -9px; left: 10px; background: #f0a000; color: #fff; font-size: 10px; font-weight: 800; padding: 1px 8px; border-radius: 10px; }
+.todo-fu.latest .todo-fu-text { font-weight: 600; }
 .todo-fu-text { font-size: 13px; color: var(--ink); line-height: 1.5; word-break: break-word; }
 .todo-fu-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
 .todo-fu-meta { font-size: 11px; color: var(--muted); }
