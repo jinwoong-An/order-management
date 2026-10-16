@@ -12,7 +12,7 @@
 <link href="/yhj-icon.svg?v=35" rel="icon" type="image/svg+xml"/>
 <link href="/yhj-icon.png?v=35" rel="icon" sizes="256x256" type="image/png"/>
 <link href="/yhj-icon.png?v=35" rel="apple-touch-icon"/>
-<link href="/styles.css?v=66.0.0" rel="stylesheet"/>
+<link href="/styles.css?v=66.1.0" rel="stylesheet"/>
 </head>
 <body>
 <div class="app-shell">
@@ -97,7 +97,7 @@
 <button class="button subtle" id="resetFilterButton">필터 초기화</button>
 </div>
 <div class="filter-line split-filter-line">
-<div class="filter-block"><span class="filter-label">진행 상태</span><div class="chip-group status-chips" id="statusFilterButtons"><button class="filter-chip main-progress" data-status="in_progress" type="button">진행 중</button><button class="filter-chip main-invoice" data-status="invoice_pending" type="button">계산서 대기</button><button class="filter-chip main-complete" data-status="complete" type="button">처리 완료</button></div></div>
+<div class="filter-block"><span class="filter-label">진행 상태</span><div class="chip-group status-chips" id="statusFilterButtons"><button class="filter-chip main-undelivered" data-status="undelivered" type="button">미납품</button><button class="filter-chip main-invoice" data-status="invoice_pending" type="button">계산서 대기</button><button class="filter-chip main-complete" data-status="complete" type="button">처리 완료</button></div></div>
 <div class="filter-block due-filter-block"><span class="filter-label">납기 기준</span><select class="small-select" id="dueYearFilter"></select><div class="chip-group month-chips" id="dueMonthButtons"></div></div>
 </div>
 <div class="filter-line"><span class="filter-label">아이템</span><div class="chip-group item-chips" id="itemFilterButtons"><button class="filter-chip item-D" data-item="D" type="button">D</button><button class="filter-chip item-F" data-item="F" type="button">F</button><button class="filter-chip item-G" data-item="G" type="button">G</button><button class="filter-chip item-H" data-item="H" type="button">H</button><button class="filter-chip item-I" data-item="I" type="button">I</button><button class="filter-chip item-J" data-item="J" type="button">J</button><button class="filter-chip item-ETC" data-item="ETC" type="button">ETC</button></div><span class="filter-help">상태·월·아이템은 여러 개를 동시에 선택할 수 있습니다.</span></div>
@@ -383,6 +383,6 @@
 </dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <script src="/vendor/xlsx.full.min.js"></script>
-<script src="/app.js?v=66.0.0" type="module"></script>
+<script src="/app.js?v=66.1.0" type="module"></script>
 </body>
 </html>

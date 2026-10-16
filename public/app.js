@@ -243,7 +243,13 @@ function filteredOrders() {
       return hay.includes(q);
     });
   }
-  if (ui.statusFilter.size) rows = rows.filter((o) => ui.statusFilter.has(statusOf(o)));
+  if (ui.statusFilter.size) rows = rows.filter((o) => {
+    for (const f of ui.statusFilter) {
+      if (f === "undelivered") { if (!o.deliveryDate) return true; }
+      else if (statusOf(o) === f) return true;
+    }
+    return false;
+  });
   if (ui.itemFilter.size) rows = rows.filter((o) => (o.items || []).some((it) => ui.itemFilter.has(it.item)));
   if (ui.dueYear) rows = rows.filter((o) => yearOf(o.dueDate) === Number(ui.dueYear));
   if (ui.dueMonths.size) rows = rows.filter((o) => ui.dueMonths.has(monthOf(o.dueDate)));
@@ -269,8 +275,8 @@ function populateOrderYearFilter() {
 }
 
 function renderStatusOverview() {
-  const counts = { in_progress: 0, invoice_pending: 0, complete: 0 };
-  let amount = { in_progress: 0, invoice_pending: 0, complete: 0 };
+  const counts = { undelivered: 0, invoice_pending: 0, complete: 0 };
+  let amount = { undelivered: 0, invoice_pending: 0, complete: 0 };
   // 선택한 발주 연도(발주일 기준)만 집계
   const yearOrders = ui.orderYear === "all"
     ? store.orders
@@ -279,9 +285,10 @@ function renderStatusOverview() {
     const s = statusOf(o);
     counts[s] += 1;
     amount[s] += orderTotal(o);
+    if (!o.deliveryDate) { counts.undelivered += 1; amount.undelivered += orderTotal(o); }
   }
   const cards = [
-    ["in_progress", "진행 중", "main-progress"],
+    ["undelivered", "미납품", "main-undelivered"],
     ["invoice_pending", "계산서 대기", "main-invoice"],
     ["complete", "처리 완료", "main-complete"],
   ];

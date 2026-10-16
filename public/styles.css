@@ -166,7 +166,7 @@ small { font-size: 12px; }
 .status-card span { font-size: 12px; color: var(--muted); }
 .status-card strong { font-size: 20px; display: block; }
 .status-card small { font-size: 12px; color: var(--muted); }
-.main-progress .status-dot { background: var(--blue); }
+.main-undelivered .status-dot { background: #a371f7; }
 .main-invoice .status-dot { background: var(--orange); }
 .main-complete .status-dot { background: var(--green); }
 
